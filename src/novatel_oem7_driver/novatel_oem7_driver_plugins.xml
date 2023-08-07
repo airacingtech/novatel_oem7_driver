@@ -73,6 +73,12 @@
             Odometry support. 
         </description>
     </class>
+
+    <class name="RangeHandler" type="novatel_oem7_driver::RangeHandler" base_class_type="novatel_oem7_driver::Oem7MessageHandlerIf">
+        <description>
+            Range support. 
+        </description>
+    </class>
     
 
 </library>

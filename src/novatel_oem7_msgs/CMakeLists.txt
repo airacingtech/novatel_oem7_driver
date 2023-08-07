@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(novatel_oem7_msgs)
 
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 set(MSG_DEPS std_msgs)
 
@@ -20,6 +20,7 @@ set(MSG_FILES
   msg/BESTUTM.msg
   msg/BESTVEL.msg
   msg/BESTGNSSPOS.msg
+  msg/BESTGNSSVEL.msg
   msg/PPPPOS.msg
   msg/HEADING2.msg
   msg/INSCONFIG.msg
@@ -56,6 +57,8 @@ set(MSG_FILES
   msg/LocalAreaStatus.msg
   msg/AccessStatus.msg
   msg/GeogatingStatus.msg
+  msg/RANGEOBSERVATION.msg
+  msg/RANGE.msg
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}

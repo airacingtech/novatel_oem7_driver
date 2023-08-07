@@ -32,7 +32,7 @@
 #include <novatel_oem7_driver/oem7_ros_messages.hpp>
 
 #include <tf2_ros/transform_broadcaster.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 #include <oem7_ros_publisher.hpp>
 
@@ -191,7 +191,10 @@ namespace novatel_oem7_driver
 
         tf2::Vector3 angular_velocity;
         tf2::fromMsg(imu_->angular_velocity, angular_velocity);
-        tf2::convert(local_tf.inverse()(angular_velocity), odometry->twist.twist.angular); 
+        // tf2::convert(local_tf.inverse()(angular_velocity), odometry->twist.twist.angular);
+        odometry->twist.twist.angular.x = local_tf.inverse()(angular_velocity).getX();
+        odometry->twist.twist.angular.y = local_tf.inverse()(angular_velocity).getY();
+        odometry->twist.twist.angular.z = local_tf.inverse()(angular_velocity).getZ();
         
         tf2::Vector3 local_angular_vel_cov = local_tf.inverse()(tf2::Vector3(
                                                                 imu_->angular_velocity_covariance[0], 
@@ -212,7 +215,10 @@ namespace novatel_oem7_driver
                                                                           inspva_->east_velocity, 
                                                                           inspva_->north_velocity, 
                                                                           inspva_->up_velocity));
-          tf2::convert(local_linear_velocity, odometry->twist.twist.linear);        
+          // tf2::convert(local_linear_velocity, odometry->twist.twist.linear);        
+          odometry->twist.twist.linear.x = local_linear_velocity.getX();
+          odometry->twist.twist.linear.y = local_linear_velocity.getY();
+          odometry->twist.twist.linear.z = local_linear_velocity.getZ();
         }
         if(inspvax_)
         {

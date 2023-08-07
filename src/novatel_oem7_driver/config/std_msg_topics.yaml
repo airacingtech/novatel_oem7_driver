@@ -12,6 +12,7 @@ BESTGNSSPOS:        {topic: bestgnsspos,      frame_id: gps}
 BESTPOS:            {topic: bestpos,          frame_id: gps}
 BESTUTM:            {topic: bestutm,          frame_id: gps}
 BESTVEL:            {topic: bestvel,          frame_id: gps}
+BESTGNSSVEL:        {topic: bestgnssvel,      frame_id: gps}
 PPPPOS:             {topic: ppppos,           frame_id: gps}
 TERRASTARSTATUS:    {topic: terrastarstatus,  frame_id: gps}
 TERRASTARINFO:      {topic: terrastarinfo,    frame_id: gps}
@@ -22,8 +23,9 @@ INSPVAX:            {topic: inspvax,          frame_id: gps,  queue_size: 10}
 INSSTDEV:           {topic: insstdev,         frame_id: gps,  queue_size: 10}
 INSCONFIG:          {topic: insconfig,        frame_id: gps,  queue_size: 10}
 RXSTATUS:           {topic: rxstatus,         frame_id: gps,  queue_size: 10}
-TIME:               {topic: time,             frame_id: gps} 
-
+TIME:               {topic: time,             frame_id: gps}
+RANGE:              {topic: range,            frame_id: gps_ant_1}
+RANGE_1:            {topic: range_1,          frame_id: gps_ant_2}
 
 
 
