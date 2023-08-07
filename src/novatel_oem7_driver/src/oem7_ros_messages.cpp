@@ -38,6 +38,7 @@
 #include "novatel_oem7_msgs/msg/bestvel.hpp"
 #include "novatel_oem7_msgs/msg/bestutm.hpp"
 #include "novatel_oem7_msgs/msg/bestgnsspos.hpp"
+#include "novatel_oem7_msgs/msg/bestgnssvel.hpp"
 #include "novatel_oem7_msgs/msg/ppppos.hpp"
 #include "novatel_oem7_msgs/msg/inspva.hpp"
 #include "novatel_oem7_msgs/msg/inspvax.hpp"
@@ -47,6 +48,8 @@
 #include "novatel_oem7_msgs/msg/rxstatus.hpp"
 #include "novatel_oem7_msgs/msg/terrastarinfo.hpp"
 #include "novatel_oem7_msgs/msg/terrastarstatus.hpp"
+#include "novatel_oem7_msgs/msg/rangeobservation.hpp"
+#include "novatel_oem7_msgs/msg/range.hpp"
 #include "novatel_oem7_msgs/msg/time.hpp"
 
 
@@ -254,6 +257,30 @@ MakeROSMessage<novatel_oem7_msgs::msg::BESTGNSSPOS>(
 
   static const std::string name = "BESTGNSSPOS";
   SetOem7Header(msg, name, bestgnsspos->nov_header);
+}
+
+template<>
+void
+MakeROSMessage<novatel_oem7_msgs::msg::BESTGNSSVEL>(
+    const Oem7RawMessageIf::ConstPtr& msg,
+    std::shared_ptr<novatel_oem7_msgs::msg::BESTGNSSVEL>& bestgnssvel)
+{
+  assert(msg->getMessageId() == BESTGNSSVEL_OEM7_MSGID);
+
+  const BESTGNSSVELMem* bv = reinterpret_cast<const BESTGNSSVELMem*>(msg->getMessageData(OEM7_BINARY_MSG_HDR_LEN));
+  bestgnssvel.reset(new novatel_oem7_msgs::msg::BESTGNSSVEL);
+
+  bestgnssvel->sol_status.status = bv->sol_stat;
+  bestgnssvel->vel_type.type     = bv->vel_type;
+  bestgnssvel->latency           = bv->latency;
+  bestgnssvel->diff_age          = bv->diff_age;
+  bestgnssvel->hor_speed         = bv->hor_speed;
+  bestgnssvel->trk_gnd           = bv->track_gnd;
+  bestgnssvel->ver_speed         = bv->ver_speed;
+  bestgnssvel->reserved          = bv->reserved;
+
+  static const std::string name = "BESTGNSSVEL";
+  SetOem7Header(msg, name, bestgnssvel->nov_header);
 }
 
 template<>
@@ -627,6 +654,38 @@ MakeROSMessage<novatel_oem7_msgs::msg::TERRASTARSTATUS>(
   SetOem7Header(msg, name, terrastarstatus->nov_header);
 }
 
+template<>
+void
+MakeROSMessage<novatel_oem7_msgs::msg::RANGE>(
+    const Oem7RawMessageIf::ConstPtr& msg,
+    std::shared_ptr<novatel_oem7_msgs::msg::RANGE>& range)
+{
+  assert(msg->getMessageId() == RANGE_OEM7_MSGID);
+
+  const RangeMem* rmem = reinterpret_cast<const RangeMem*>(msg->getMessageData(OEM7_BINARY_MSG_HDR_LEN));
+  range.reset(new novatel_oem7_msgs::msg::RANGE);
+  range->num_obs = rmem->num_obs;
+  range->obs.reserve(range->num_obs);
+  static const size_t obs_offset = OEM7_BINARY_MSG_HDR_LEN + sizeof(uint32_t);
+  novatel_oem7_msgs::msg::RANGEOBSERVATION obs_msg;
+  for (uint32_t i = 0; i < range->num_obs; i++)
+  {
+    const RangeObsMem* obs_mem = reinterpret_cast<const RangeObsMem*>(msg->getMessageData(obs_offset + (sizeof(RangeObsMem) * i)));
+    obs_msg.prn_number = obs_mem->prn;
+    obs_msg.glofreq = obs_mem->glofreq;
+    obs_msg.psr = obs_mem->psr;
+    obs_msg.psr_std = obs_mem->psr_std;
+    obs_msg.adr = obs_mem->adr;
+    obs_msg.adr_std = obs_mem->adr_std;
+    obs_msg.dopp = obs_mem->dopp;
+    obs_msg.noise_density_ratio = obs_mem->noise_density_ratio;
+    obs_msg.locktime = obs_mem->locktime;
+    obs_msg.tracking_status = obs_mem->tracking_status;
+    range->obs.push_back(obs_msg);
+  }
+  static const std::string name = "RANGE";
+  SetOem7Header(msg, name, range->nov_header);
+}
 
 template
 void
@@ -643,6 +702,10 @@ MakeROSMessage(const Oem7RawMessageIf::ConstPtr&,  std::shared_ptr<novatel_oem7_
 template
 void
 MakeROSMessage(const Oem7RawMessageIf::ConstPtr&,  std::shared_ptr<novatel_oem7_msgs::msg::BESTGNSSPOS>&);
+
+template
+void
+MakeROSMessage(const Oem7RawMessageIf::ConstPtr&,  std::shared_ptr<novatel_oem7_msgs::msg::BESTGNSSVEL>&);
 
 template
 void
@@ -683,6 +746,10 @@ MakeROSMessage(const Oem7RawMessageIf::ConstPtr&,  std::shared_ptr<novatel_oem7_
 template
 void
 MakeROSMessage(const Oem7RawMessageIf::ConstPtr&,  std::shared_ptr<novatel_oem7_msgs::msg::TERRASTARINFO>&);
+
+template
+void
+MakeROSMessage(const Oem7RawMessageIf::ConstPtr&,  std::shared_ptr<novatel_oem7_msgs::msg::RANGE>&);
 
 
 //---------------------------------------------------------------------------------------------------------------

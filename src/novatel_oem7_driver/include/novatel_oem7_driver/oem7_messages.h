@@ -94,6 +94,29 @@ namespace novatel_oem7_driver
     int32_t    gps_milliseconds;
   };
 
+  struct __attribute__((packed))
+  RangeObsMem
+  {
+    uint16_t prn;
+    uint16_t glofreq;
+    double psr;
+    float psr_std;
+    double adr;
+    float adr_std;
+    float dopp;
+    float noise_density_ratio;
+    float locktime;
+    uint32_t tracking_status;
+  };
+  static_assert(sizeof(RangeObsMem) == 44, ASSERT_MSG);
+
+  struct __attribute__((packed))
+  RangeMem
+  {
+    uint32_t num_obs;
+  };
+  static_assert(sizeof(RangeMem) == 4, ASSERT_MSG);
+
 
   struct __attribute__((packed))
   BESTPOSMem
@@ -165,6 +188,19 @@ namespace novatel_oem7_driver
    };
    static_assert(sizeof(BESTGNSSPOSMem) == 72, ASSERT_MSG);
 
+  struct __attribute__((packed))
+  BESTGNSSVELMem
+  {
+    uint32_t           sol_stat;
+    uint32_t           vel_type;
+    float              latency;
+    float              diff_age;
+    double             hor_speed;
+    double             track_gnd;
+    double             ver_speed;
+    float              reserved;
+   };
+  static_assert(sizeof(BESTGNSSVELMem) == 44, ASSERT_MSG);
 
   struct __attribute__((packed))
   INSPVASmem

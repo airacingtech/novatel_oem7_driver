@@ -36,6 +36,7 @@ namespace novatel_oem7_driver
   const int BESTUTM_OEM7_MSGID            =  726;
   const int BESTVEL_OEM7_MSGID            =   99;
   const int BESTGNSSPOS_OEM7_MSGID        = 1429;
+  const int BESTGNSSVEL_OEM7_MSGID        = 1430;
   const int PPPPOS_OEM7_MSGID             = 1538;
   const int CORRIMUS_OEM7_MSGID           = 2264;
   const int HEADING2_OEM7_MSGID           = 1335;
@@ -50,6 +51,7 @@ namespace novatel_oem7_driver
   const int TERRASTARSTATUS_OEM7_MSGID    = 1729; 
   const int TIME_OEM7_MSGID               =  101;
   const int RAWIMUSX_OEM7_MSGID           =  1462;
+  const int RANGE_OEM7_MSGID              =  43;
 
   // NMEA0183
   const int GLMLA_OEM7_MSGID              =   859;

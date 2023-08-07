@@ -6,4 +6,5 @@ oem7_msg_handlers:
     - TimeHandler
     - NMEAHandler
     - OdometryHandler
+    - RangeHandler
             
