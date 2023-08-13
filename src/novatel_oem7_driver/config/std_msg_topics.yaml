@@ -26,8 +26,7 @@ RXSTATUS:           {topic: rxstatus,         frame_id: gps,  queue_size: 10}
 TIME:               {topic: time,             frame_id: gps}
 RANGE:              {topic: range,            frame_id: gps_ant_1}
 RANGE_1:            {topic: range_1,          frame_id: gps_ant_2}
-
-
-
+MASTERPOS:          {topic: masterpos}        frame_id: gps_ant_1}
+ROVERPOS:           {topic: masterpos}        frame_id: gps_ant_2}
    
 
