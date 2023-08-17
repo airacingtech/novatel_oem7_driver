@@ -51,7 +51,8 @@
 #include "novatel_oem7_msgs/msg/rangeobservation.hpp"
 #include "novatel_oem7_msgs/msg/range.hpp"
 #include "novatel_oem7_msgs/msg/time.hpp"
-
+#include "novatel_oem7_msgs/msg/masterpos.hpp"
+#include "novatel_oem7_msgs/msg/roverpos.hpp"
 
 
 #define arr_size(_arr_) (sizeof(_arr_) / sizeof(_arr_[0]))
@@ -687,6 +688,71 @@ MakeROSMessage<novatel_oem7_msgs::msg::RANGE>(
   SetOem7Header(msg, name, range->nov_header);
 }
 
+template<>
+void
+MakeROSMessage<novatel_oem7_msgs::msg::MASTERPOS>(
+    const Oem7RawMessageIf::ConstPtr& msg,
+    std::shared_ptr<novatel_oem7_msgs::msg::MASTERPOS>& masterpos)
+{
+  assert(msg->getMessageId() == MASTERPOS_OEM7_MSGID);
+
+  const MASTERPOSMem* mp = reinterpret_cast<const MASTERPOSMem*>(msg->getMessageData(OEM7_BINARY_MSG_HDR_LEN));
+  masterpos.reset(new novatel_oem7_msgs::msg::MASTERPOS);
+
+  masterpos->sol_status.status      = mp->sol_stat;
+  masterpos->pos_type.type          = mp->pos_type;
+  masterpos->lat                    = mp->lat;
+  masterpos->lon                    = mp->lon;
+  masterpos->hgt                    = mp->hgt;
+  masterpos->undulation             = mp->undulation;
+  masterpos->datum_id               = mp->datum_id;
+  masterpos->lat_stdev              = mp->lat_stdev;
+  masterpos->lon_stdev              = mp->lon_stdev;
+  masterpos->hgt_stdev              = mp->hgt_stdev;
+  std::copy(std::begin(mp->stn_id), std::end(mp->stn_id), std::begin(masterpos->stn_id));
+  masterpos->reserved               = mp->reserved;
+  masterpos->num_sv_tracked         = mp->num_sv_tracked;
+  masterpos->num_sv_in_sol          = mp->num_sv_in_sol;
+  masterpos->num_sv_obs             = mp->num_sv_obs;
+  masterpos->num_sv_multi           = mp->num_sv_multi;
+  masterpos->sol_source.source      = mp->sol_source;
+
+  static const std::string name = "MASTERPOS";
+  SetOem7Header(msg, name, masterpos->nov_header);
+}
+
+template<>
+void
+MakeROSMessage<novatel_oem7_msgs::msg::ROVERPOS>(
+    const Oem7RawMessageIf::ConstPtr& msg,
+    std::shared_ptr<novatel_oem7_msgs::msg::ROVERPOS>& roverpos)
+{
+  assert(msg->getMessageId() == ROVERPOS_OEM7_MSGID);
+
+  const ROVERPOSMem* rp = reinterpret_cast<const ROVERPOSMem*>(msg->getMessageData(OEM7_BINARY_MSG_HDR_LEN));
+  roverpos.reset(new novatel_oem7_msgs::msg::ROVERPOS);
+
+  roverpos->sol_status.status      = rp->sol_stat;
+  roverpos->pos_type.type          = rp->pos_type;
+  roverpos->lat                    = rp->lat;
+  roverpos->lon                    = rp->lon;
+  roverpos->hgt                    = rp->hgt;
+  roverpos->undulation             = rp->undulation;
+  roverpos->datum_id               = rp->datum_id;
+  roverpos->lat_stdev              = rp->lat_stdev;
+  roverpos->lon_stdev              = rp->lon_stdev;
+  roverpos->hgt_stdev              = rp->hgt_stdev;
+  std::copy(std::begin(rp->stn_id), std::end(rp->stn_id), std::begin(roverpos->stn_id));
+  roverpos->reserved               = rp->reserved;
+  roverpos->num_sv_tracked         = rp->num_sv_tracked;
+  roverpos->num_sv_in_sol          = rp->num_sv_in_sol;
+  roverpos->num_sv_obs             = rp->num_sv_obs;
+  roverpos->num_sv_multi           = rp->num_sv_multi;
+
+  static const std::string name = "ROVERPOS";
+  SetOem7Header(msg, name, roverpos->nov_header);
+}
+
 template
 void
 MakeROSMessage(const Oem7RawMessageIf::ConstPtr&, std::shared_ptr<novatel_oem7_msgs::msg::BESTPOS>&);
@@ -750,6 +816,14 @@ MakeROSMessage(const Oem7RawMessageIf::ConstPtr&,  std::shared_ptr<novatel_oem7_
 template
 void
 MakeROSMessage(const Oem7RawMessageIf::ConstPtr&,  std::shared_ptr<novatel_oem7_msgs::msg::RANGE>&);
+
+template
+void
+MakeROSMessage(const Oem7RawMessageIf::ConstPtr&,  std::shared_ptr<novatel_oem7_msgs::msg::MASTERPOS>&);
+
+template
+void
+MakeROSMessage(const Oem7RawMessageIf::ConstPtr&,  std::shared_ptr<novatel_oem7_msgs::msg::ROVERPOS>&);
 
 
 //---------------------------------------------------------------------------------------------------------------

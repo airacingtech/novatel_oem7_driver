@@ -59,6 +59,8 @@ set(MSG_FILES
   msg/GeogatingStatus.msg
   msg/RANGEOBSERVATION.msg
   msg/RANGE.msg
+  msg/MASTERPOS.msg
+  msg/ROVERPOS.msg
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
