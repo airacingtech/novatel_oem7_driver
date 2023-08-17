@@ -544,6 +544,51 @@ namespace novatel_oem7_driver
   };
   static_assert(sizeof(TERRASTARSTATUSMem) == 20, ASSERT_MSG);
 
+  struct __attribute__((packed))
+  MASTERPOSMem
+  {
+    oem7_enum_t                     sol_stat;
+    oem7_enum_t                     pos_type;
+    double                          lat;
+    double                          lon;
+    double                          hgt;
+    float                           undulation;
+    uint32_t                        datum_id;
+    float                           lat_stdev;
+    float                           lon_stdev;
+    float                           hgt_stdev;
+    oem7_char_t                     stn_id[4];
+    double                          reserved;
+    uint8_t                         num_sv_tracked;
+    uint8_t                         num_sv_in_sol;
+    uint8_t                         num_sv_obs;
+    uint8_t                         num_sv_multi;
+    uint8_t                         sol_source;
+  };
+  static_assert(sizeof(MASTERPOSMem) == 69, ASSERT_MSG);
+
+  struct __attribute__((packed))
+  ROVERPOSMem
+  {
+    oem7_enum_t                     sol_stat;
+    oem7_enum_t                     pos_type;
+    double                          lat;
+    double                          lon;
+    double                          hgt;
+    float                           undulation;
+    uint32_t                        datum_id;
+    float                           lat_stdev;
+    float                           lon_stdev;
+    float                           hgt_stdev;
+    oem7_char_t                     stn_id[4];
+    double                          reserved;
+    uint8_t                         num_sv_tracked;
+    uint8_t                         num_sv_in_sol;
+    uint8_t                         num_sv_obs;
+    uint8_t                         num_sv_multi;
+  };
+  static_assert(sizeof(ROVERPOSMem) == 68, ASSERT_MSG);
+
   const std::size_t OEM7_BINARY_MSG_HDR_LEN       = sizeof(Oem7MessageHeaderMem);
   const std::size_t OEM7_BINARY_MSG_SHORT_HDR_LEN = sizeof(Oem7MessgeShortHeaderMem);
 

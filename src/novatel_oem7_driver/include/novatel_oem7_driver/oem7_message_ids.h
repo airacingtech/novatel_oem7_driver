@@ -52,6 +52,8 @@ namespace novatel_oem7_driver
   const int TIME_OEM7_MSGID               =  101;
   const int RAWIMUSX_OEM7_MSGID           =  1462;
   const int RANGE_OEM7_MSGID              =  43;
+  const int MASTERPOS_OEM7_MSGID          =  1051;
+  const int ROVERPOS_OEM7_MSGID           =  1052;
 
   // NMEA0183
   const int GLMLA_OEM7_MSGID              =   859;

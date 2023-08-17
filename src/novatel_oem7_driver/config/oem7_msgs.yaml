@@ -28,6 +28,8 @@ oem7_msgs:
  -  PSRDOP2:1163
  -  BESTGNSSPOS:1429
  -  BESTGNSSVEL:1430
+ -  MASTERPOS:1051
+ -  ROVERPOS:1052
    # More messages may be added in order to process Oem7 'raw' messages.
    
    
