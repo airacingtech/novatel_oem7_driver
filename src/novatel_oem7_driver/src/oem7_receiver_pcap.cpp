@@ -179,6 +179,34 @@ namespace novatel_oem7_driver
       }
     }
 
+    void requestSeekBackward()
+    {
+      double current_relative;
+      {
+        std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
+        current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_.load();
+      }
+      double target_relative = std::max(0.0, current_relative - SEEK_INTERVAL_SECONDS);
+      seek_target_.store(target_relative);
+      seek_requested_.store(true);
+      RCLCPP_INFO(node_->get_logger(), 
+        "[SEEK] Seeking backward %.0fs to %.1fs", SEEK_INTERVAL_SECONDS, target_relative);
+    }
+
+    void requestSeekForward()
+    {
+      double current_relative;
+      {
+        std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
+        current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_.load();
+      }
+      double target_relative = current_relative + SEEK_INTERVAL_SECONDS;
+      seek_target_.store(target_relative);
+      seek_requested_.store(true);
+      RCLCPP_INFO(node_->get_logger(), 
+        "[SEEK] Seeking forward %.0fs to %.1fs", SEEK_INTERVAL_SECONDS, target_relative);
+    }
+
     void keyboardInputThread()
     {
       if (tty_fd_ < 0)
@@ -193,8 +221,8 @@ namespace novatel_oem7_driver
         "  SPACE     - Pause/Resume\n"
         "  UP        - Increase speed (0.10x increments)\n"
         "  DOWN      - Decrease speed (0.10x increments)\n"
-        "  LEFT (<)  - Seek backward 5 seconds\n"
-        "  RIGHT (>) - Seek forward 5 seconds\n"
+        "  LEFT (or ,)  - Seek backward 5 seconds\n"
+        "  RIGHT (or .) - Seek forward 5 seconds\n"
         "  q         - Quit\n"
         "=======================================================\n");
 
@@ -237,29 +265,11 @@ namespace novatel_oem7_driver
                     break;
                   }
                   case 'D': {
-                    double current_relative;
-                    {
-                      std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
-                      current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_.load();
-                    }
-                    double target_relative = std::max(0.0, current_relative - SEEK_INTERVAL_SECONDS);
-                    seek_target_.store(target_relative);
-                    seek_requested_.store(true);
-                    RCLCPP_INFO(node_->get_logger(), 
-                      "[SEEK] Seeking backward %.0fs to %.1fs", SEEK_INTERVAL_SECONDS, target_relative);
+                    requestSeekBackward();
                     break;
                   }
                   case 'C': {
-                    double current_relative;
-                    {
-                      std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
-                      current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_.load();
-                    }
-                    double target_relative = current_relative + SEEK_INTERVAL_SECONDS;
-                    seek_target_.store(target_relative);
-                    seek_requested_.store(true);
-                    RCLCPP_INFO(node_->get_logger(), 
-                      "[SEEK] Seeking forward %.0fs to %.1fs", SEEK_INTERVAL_SECONDS, target_relative);
+                    requestSeekForward();
                     break;
                   }
                 }
@@ -274,29 +284,11 @@ namespace novatel_oem7_driver
           }
           else if (c == '<' || c == ',')
           {
-            double current_relative;
-            {
-              std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
-              current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_.load();
-            }
-            double target_relative = std::max(0.0, current_relative - SEEK_INTERVAL_SECONDS);
-            seek_target_.store(target_relative);
-            seek_requested_.store(true);
-            RCLCPP_INFO(node_->get_logger(), 
-              "[SEEK] Seeking backward %.0fs to %.1fs", SEEK_INTERVAL_SECONDS, target_relative);
+            requestSeekBackward();
           }
           else if (c == '>' || c == '.')
           {
-            double current_relative;
-            {
-              std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
-              current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_.load();
-            }
-            double target_relative = current_relative + SEEK_INTERVAL_SECONDS;
-            seek_target_.store(target_relative);
-            seek_requested_.store(true);
-            RCLCPP_INFO(node_->get_logger(), 
-              "[SEEK] Seeking forward %.0fs to %.1fs", SEEK_INTERVAL_SECONDS, target_relative);
+            requestSeekForward();
           }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(KEYBOARD_POLL_INTERVAL_MS));
@@ -604,20 +596,34 @@ namespace novatel_oem7_driver
         offset += sizeof(struct udphdr);
       }
 
-      // Calculate payload size from IP header length fields
-      payload_size = ip_total_length - (ip_header->ihl * 4);
+      // Calculate payload size from IP header length fields with underflow protection
+      size_t ip_header_len = ip_header->ihl * 4;
+      size_t transport_header_len = 0;
       
       if(ip_header->protocol == IPPROTO_TCP)
       {
-        // Get TCP header from earlier offset calculation (not ip_payload_offset)
-        size_t tcp_offset = sizeof(struct ether_header) + (ip_header->ihl * 4);
+        // Reuse validated TCP header from earlier
+        size_t tcp_offset = sizeof(struct ether_header) + ip_header_len;
+        if(packet_len < tcp_offset + sizeof(struct tcphdr))
+        {
+          return nullptr;
+        }
         const struct tcphdr* tcp_header = reinterpret_cast<const struct tcphdr*>(packet + tcp_offset);
-        payload_size -= (tcp_header->doff * 4);
+        transport_header_len = tcp_header->doff * 4;
       }
       else
       {
-        payload_size -= sizeof(struct udphdr);
+        transport_header_len = sizeof(struct udphdr);
       }
+      
+      // Validate ip_total_length before subtraction to prevent underflow
+      size_t total_header_len = ip_header_len + transport_header_len;
+      if(ip_total_length < total_header_len)
+      {
+        return nullptr;
+      }
+      
+      payload_size = ip_total_length - total_header_len;
 
       // Guard against truncated PCAP frames or malformed headers
       if(payload_size == 0 || offset + payload_size > packet_len)
