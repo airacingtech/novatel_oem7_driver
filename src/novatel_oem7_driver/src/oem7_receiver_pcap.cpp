@@ -33,34 +33,41 @@
 #include <netinet/udp.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <termios.h>
+#include <thread>
+#include <atomic>
 
 namespace novatel_oem7_driver
 {
-  /**
-   * 'Virtual' Oem7 interface, where input is read from a PCAP file.
-   * This replays TCP/UDP packet data from a packet capture file.
-   */
   class Oem7ReceiverPcap: public Oem7ReceiverIf
   {
     rclcpp::Node* node_;
 
-    pcap_t* pcap_handle_; ///< PCAP file handle
-    size_t num_bytes_read_; ///< Total number of bytes read from PCAP
-    size_t num_packets_processed_; ///< Total number of packets processed
+    pcap_t* pcap_handle_;
+    size_t num_bytes_read_;
+    size_t num_packets_processed_;
 
-    std::string pcap_file_name_; ///< PCAP file path
-    std::string target_ip_; ///< Target IP to filter (optional)
-    int target_port_; ///< Target port to filter (optional)
-    bool verbose_; ///< Enable verbose logging
-    double playback_rate_; ///< Playback speed multiplier (1.0 = realtime, 0.5 = half speed, 2.0 = double speed)
+    std::string pcap_file_name_;
+    std::string target_ip_;
+    int target_port_;
+    double playback_rate_;
 
-    // Buffer for reassembling packet stream
     std::vector<uint8_t> stream_buffer_;
     size_t stream_buffer_pos_;
 
-    // Timing control
     bool first_packet_;
     struct timeval last_packet_time_;
+    double first_pcap_timestamp_;
+    
+    std::atomic<bool> paused_;
+    std::atomic<double> playback_speed_;
+    std::atomic<double> seek_target_;
+    std::atomic<bool> seek_requested_;
+    std::thread keyboard_thread_;
+    std::atomic<bool> running_;
+    int tty_fd_;
+    struct termios orig_termios_;
 
   public:
     Oem7ReceiverPcap():
@@ -68,10 +75,16 @@ namespace novatel_oem7_driver
       num_bytes_read_(0),
       num_packets_processed_(0),
       target_port_(0),
-      verbose_(false),
       playback_rate_(1.0),
       stream_buffer_pos_(0),
-      first_packet_(true)
+      first_packet_(true),
+      first_pcap_timestamp_(0.0),
+      paused_(false),
+      playback_speed_(1.0),
+      seek_target_(0.0),
+      seek_requested_(false),
+      running_(false),
+      tty_fd_(-1)
     {
       last_packet_time_.tv_sec = 0;
       last_packet_time_.tv_usec = 0;
@@ -79,40 +92,36 @@ namespace novatel_oem7_driver
 
     ~Oem7ReceiverPcap()
     {
+      running_ = false;
+      if(keyboard_thread_.joinable())
+      {
+        keyboard_thread_.join();
+      }
+      restoreTerminal();
       if(pcap_handle_)
       {
         pcap_close(pcap_handle_);
       }
     }
 
-    /**
-     * Opens and prepares the PCAP file for reading.
-     */
     virtual bool initialize(rclcpp::Node& nh)
     {
       node_ = &nh;
 
-      // Declare and get parameters
       node_->declare_parameter("oem7_pcap_file", "");
       node_->declare_parameter("oem7_ip_addr", "");
       node_->declare_parameter("oem7_port", 0);
-      node_->declare_parameter("oem7_pcap_verbose", false);
       node_->declare_parameter("oem7_pcap_rate", 1.0);
 
       pcap_file_name_ = node_->get_parameter("oem7_pcap_file").as_string();
       target_ip_ = node_->get_parameter("oem7_ip_addr").as_string();
       target_port_ = node_->get_parameter("oem7_port").as_int();
-      verbose_ = node_->get_parameter("oem7_pcap_verbose").as_bool();
       playback_rate_ = node_->get_parameter("oem7_pcap_rate").as_double();
 
-      if(verbose_)
-      {
-        RCLCPP_INFO_STREAM(node_->get_logger(), 
-                           "Oem7Pcap['" << pcap_file_name_ << "'] "
-                           << "IP: '" << target_ip_ << "' Port: " << target_port_);
-      }
+      RCLCPP_INFO_STREAM(node_->get_logger(), 
+                         "Oem7Pcap['" << pcap_file_name_ << "'] "
+                         << "IP: '" << target_ip_ << "' Port: " << target_port_);
 
-      // Open PCAP file
       char errbuf[PCAP_ERRBUF_SIZE];
       pcap_handle_ = pcap_open_offline(pcap_file_name_.c_str(), errbuf);
       
@@ -124,16 +133,151 @@ namespace novatel_oem7_driver
         return false;
       }
 
-      if(verbose_)
-      {
-        RCLCPP_INFO_STREAM(node_->get_logger(), "Successfully opened PCAP file");
-      }
+      RCLCPP_INFO_STREAM(node_->get_logger(), "Successfully opened PCAP file");
+      
+      setupTerminal();
+      running_ = true;
+      playback_speed_.store(playback_rate_);
+      keyboard_thread_ = std::thread(&Oem7ReceiverPcap::keyboardInputThread, this);
+      
       return true;
     }
 
-    /**
-     * Reads the next packet from the PCAP file and extracts TCP/UDP payload.
-     */
+    void setupTerminal()
+    {
+      tty_fd_ = ::open("/dev/tty", O_RDWR | O_NONBLOCK);
+      if (tty_fd_ < 0)
+      {
+        return;
+      }
+      
+      tcgetattr(tty_fd_, &orig_termios_);
+      
+      struct termios raw = orig_termios_;
+      raw.c_lflag &= ~(ICANON | ECHO);
+      raw.c_cc[VMIN] = 0;
+      raw.c_cc[VTIME] = 1;
+      tcsetattr(tty_fd_, TCSANOW, &raw);
+    }
+
+    void restoreTerminal()
+    {
+      if (tty_fd_ >= 0)
+      {
+        tcsetattr(tty_fd_, TCSANOW, &orig_termios_);
+        close(tty_fd_);
+        tty_fd_ = -1;
+      }
+    }
+
+    void keyboardInputThread()
+    {
+      if (tty_fd_ < 0)
+      {
+        return;
+      }
+      
+      RCLCPP_INFO(node_->get_logger(), 
+        "\n"
+        "=======================================================\n"
+        "  PCAP Playback Controls:\n"
+        "  SPACE     - Pause/Resume\n"
+        "  UP        - Increase speed (0.10x increments)\n"
+        "  DOWN      - Decrease speed (0.10x increments)\n"
+        "  LEFT (<)  - Seek backward 5 seconds\n"
+        "  RIGHT (>) - Seek forward 5 seconds\n"
+        "  q         - Quit\n"
+        "=======================================================\n");
+
+      while (running_)
+      {
+        char c;
+        if (::read(tty_fd_, &c, 1) == 1)
+        {
+          if (c == ' ')
+          {
+            bool was_paused = paused_.load();
+            paused_.store(!was_paused);
+            RCLCPP_INFO(node_->get_logger(), 
+              was_paused ? "[RESUME] Playback resumed" : "[PAUSE] Playback paused");
+          }
+          else if (c == 27)
+          {
+            char seq[2];
+            if (::read(tty_fd_, &seq[0], 1) == 1 && 
+                ::read(tty_fd_, &seq[1], 1) == 1)
+            {
+              if (seq[0] == '[')
+              {
+                switch (seq[1])
+                {
+                  case 'A': {
+                    double current_speed = playback_speed_.load();
+                    double new_speed = std::min(current_speed + 0.10, 10.0);
+                    playback_speed_.store(new_speed);
+                    RCLCPP_INFO(node_->get_logger(), 
+                      "[SPEED] Playback speed: %.2fx", new_speed);
+                    break;
+                  }
+                  case 'B': {
+                    double current_speed = playback_speed_.load();
+                    double new_speed = std::max(current_speed - 0.10, 0.10);
+                    playback_speed_.store(new_speed);
+                    RCLCPP_INFO(node_->get_logger(), 
+                      "[SPEED] Playback speed: %.2fx", new_speed);
+                    break;
+                  }
+                  case 'D': {
+                    double current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_;
+                    double target_relative = std::max(0.0, current_relative - 5.0);
+                    seek_target_.store(target_relative);
+                    seek_requested_.store(true);
+                    RCLCPP_INFO(node_->get_logger(), 
+                      "[SEEK] Seeking backward 5s to %.1fs", target_relative);
+                    break;
+                  }
+                  case 'C': {
+                    double current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_;
+                    double target_relative = current_relative + 5.0;
+                    seek_target_.store(target_relative);
+                    seek_requested_.store(true);
+                    RCLCPP_INFO(node_->get_logger(), 
+                      "[SEEK] Seeking forward 5s to %.1fs", target_relative);
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          else if (c == 'q' || c == 'Q')
+          {
+            RCLCPP_INFO(node_->get_logger(), "[QUIT] Stopping PCAP playback...");
+            running_ = false;
+            break;
+          }
+          else if (c == '<' || c == ',')
+          {
+            double current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_;
+            double target_relative = std::max(0.0, current_relative - 5.0);
+            seek_target_.store(target_relative);
+            seek_requested_.store(true);
+            RCLCPP_INFO(node_->get_logger(), 
+              "[SEEK] Seeking backward 5s to %.1fs", target_relative);
+          }
+          else if (c == '>' || c == '.')
+          {
+            double current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_;
+            double target_relative = current_relative + 5.0;
+            seek_target_.store(target_relative);
+            seek_requested_.store(true);
+            RCLCPP_INFO(node_->get_logger(), 
+              "[SEEK] Seeking forward 5s to %.1fs", target_relative);
+          }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      }
+    }
+
     virtual bool read(boost::asio::mutable_buffer buf, size_t& rlen)
     {
       if(!pcap_handle_)
@@ -142,12 +286,10 @@ namespace novatel_oem7_driver
         return false;
       }
 
-      // Try to fill the buffer from PCAP packets
       size_t bytes_to_read = boost::asio::buffer_size(buf);
       uint8_t* buffer_ptr = boost::asio::buffer_cast<uint8_t*>(buf);
       size_t bytes_written = 0;
 
-      // First, drain any buffered data
       if(stream_buffer_pos_ < stream_buffer_.size())
       {
         size_t available = stream_buffer_.size() - stream_buffer_pos_;
@@ -170,64 +312,137 @@ namespace novatel_oem7_driver
         return true;
       }
 
-      // Read next packet from PCAP - just ONE packet per read() call
       while(rclcpp::ok())
       {
+        while (paused_.load() && running_)
+        {
+          std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        
+        if (!running_)
+        {
+          return false;
+        }
+        
         struct pcap_pkthdr* header;
         const u_char* packet_data;
         
         int result = pcap_next_ex(pcap_handle_, &header, &packet_data);
         
-        if(result == -2) // End of file
+        if(result == -2)
         {
-          if(verbose_)
-          {
-            RCLCPP_INFO_STREAM(node_->get_logger(), 
-                               "End of PCAP file. Processed " << num_packets_processed_ 
-                               << " packets, " << num_bytes_read_ << " bytes total");
-          }
+          RCLCPP_INFO_STREAM(node_->get_logger(), 
+                             "End of PCAP file. Processed " << num_packets_processed_ 
+                             << " packets, " << num_bytes_read_ << " bytes total");
           return false;
         }
-        else if(result == -1) // Error
+        else if(result == -1)
         {
           RCLCPP_ERROR_STREAM(node_->get_logger(), 
                               "Error reading PCAP: " << pcap_geterr(pcap_handle_));
           return false;
         }
-        else if(result == 0) // Timeout (shouldn't happen with offline files)
+        else if(result == 0)
         {
           continue;
         }
 
-        // Parse the packet and extract payload
+        double current_pcap_timestamp = header->ts.tv_sec + header->ts.tv_usec / 1000000.0;
+        
+        if(first_packet_)
+        {
+          first_pcap_timestamp_ = current_pcap_timestamp;
+          first_packet_ = false;
+        }
+        
+        if(seek_requested_.load())
+        {
+          double target_relative = seek_target_.load();
+          double target_absolute = first_pcap_timestamp_ + target_relative;
+          seek_requested_.store(false);
+          
+          if(target_absolute < current_pcap_timestamp)
+          {
+            pcap_close(pcap_handle_);
+            char errbuf[PCAP_ERRBUF_SIZE];
+            pcap_handle_ = pcap_open_offline(pcap_file_name_.c_str(), errbuf);
+            
+            if(!pcap_handle_)
+            {
+              RCLCPP_ERROR_STREAM(node_->get_logger(), "Failed to reopen PCAP file: " << errbuf);
+              return false;
+            }
+            
+            first_packet_ = true;
+            stream_buffer_.clear();
+            stream_buffer_pos_ = 0;
+            
+            while(running_ && (result = pcap_next_ex(pcap_handle_, &header, &packet_data)) >= 0)
+            {
+              if(result == 0) continue;
+              
+              double ts = header->ts.tv_sec + header->ts.tv_usec / 1000000.0;
+              
+              if(first_packet_)
+              {
+                first_pcap_timestamp_ = ts;
+                first_packet_ = false;
+                target_absolute = first_pcap_timestamp_ + target_relative;
+              }
+              
+              if(ts >= target_absolute)
+              {
+                current_pcap_timestamp = ts;
+                last_packet_time_ = header->ts;
+                RCLCPP_INFO(node_->get_logger(), "[SEEK] Jumped to %.1fs", target_relative);
+                break;
+              }
+            }
+            continue;
+          }
+          
+          if(target_absolute > current_pcap_timestamp)
+          {
+            while(running_ && (result = pcap_next_ex(pcap_handle_, &header, &packet_data)) >= 0)
+            {
+              if(result == 0) continue;
+              
+              double ts = header->ts.tv_sec + header->ts.tv_usec / 1000000.0;
+              if(ts >= target_absolute)
+              {
+                current_pcap_timestamp = ts;
+                last_packet_time_ = header->ts;
+                RCLCPP_INFO(node_->get_logger(), "[SEEK] Jumped to %.1fs", target_relative);
+                break;
+              }
+            }
+            continue;
+          }
+        }
+
         size_t payload_size = 0;
         const uint8_t* payload = extract_payload(packet_data, header->caplen, payload_size);
         
         if(payload && payload_size > 0)
         {
-          // Handle timing - sleep BEFORE processing this packet to match PCAP timestamps
-          if(!first_packet_)
+          if(!first_packet_ && last_packet_time_.tv_sec != 0)
           {
-            // Calculate time delta from last packet
             long delta_sec = header->ts.tv_sec - last_packet_time_.tv_sec;
             long delta_usec = header->ts.tv_usec - last_packet_time_.tv_usec;
             long delta_total_usec = delta_sec * 1000000 + delta_usec;
             
-            // Apply playback rate and sleep to match the actual packet timing
             if(delta_total_usec > 0)
             {
-              long sleep_usec = static_cast<long>(delta_total_usec / playback_rate_);
+              double current_speed = playback_speed_.load();
+              long sleep_usec = static_cast<long>(delta_total_usec / current_speed);
               usleep(sleep_usec);
             }
           }
           
-          // Update last packet time
           last_packet_time_ = header->ts;
           first_packet_ = false;
-          
           num_packets_processed_++;
           
-          // Return this packet's payload - just like a real socket would
           if(payload_size <= bytes_to_read)
           {
             std::memcpy(buffer_ptr, payload, payload_size);
@@ -237,7 +452,6 @@ namespace novatel_oem7_driver
           }
           else
           {
-            // Payload is larger than buffer - copy what fits, buffer the rest
             std::memcpy(buffer_ptr, payload, bytes_to_read);
             stream_buffer_.assign(payload + bytes_to_read, payload + payload_size);
             stream_buffer_pos_ = 0;
@@ -246,65 +460,47 @@ namespace novatel_oem7_driver
             return true;
           }
         }
-        // If packet didn't match our filter, continue to next packet
       }
 
       return false;
     }
 
-    /**
-     * Takes no action (PCAP replay is read-only).
-     *
-     * @return false always.
-     */
     virtual bool write(boost::asio::const_buffer buf)
     {
       return false;
     }
 
   private:
-    /**
-     * Extracts TCP/UDP payload from a packet.
-     * Returns pointer to payload and sets payload_size.
-     */
     const uint8_t* extract_payload(const uint8_t* packet, size_t packet_len, size_t& payload_size)
     {
       payload_size = 0;
 
-      // Check minimum ethernet header size
       if(packet_len < sizeof(struct ether_header))
       {
         return nullptr;
       }
 
-      // Parse Ethernet header
       struct ether_header* eth_header = (struct ether_header*)packet;
       uint16_t ether_type = ntohs(eth_header->ether_type);
-
       size_t offset = sizeof(struct ether_header);
 
-      // Only process IPv4 packets
       if(ether_type != ETHERTYPE_IP)
       {
         return nullptr;
       }
 
-      // Check for IP header
       if(packet_len < offset + sizeof(struct iphdr))
       {
         return nullptr;
       }
 
-      // Parse IP header
       struct iphdr* ip_header = (struct iphdr*)(packet + offset);
       
-      // Only process TCP and UDP packets
       if(ip_header->protocol != IPPROTO_TCP && ip_header->protocol != IPPROTO_UDP)
       {
         return nullptr;
       }
 
-      // Filter by IP address if specified
       if(!target_ip_.empty())
       {
         struct in_addr src_addr, dst_addr;
@@ -323,19 +519,15 @@ namespace novatel_oem7_driver
       size_t ip_header_len = ip_header->ihl * 4;
       offset += ip_header_len;
 
-      // Handle TCP packets
       if(ip_header->protocol == IPPROTO_TCP)
       {
-        // Check for TCP header
         if(packet_len < offset + sizeof(struct tcphdr))
         {
           return nullptr;
         }
 
-        // Parse TCP header
         struct tcphdr* tcp_header = (struct tcphdr*)(packet + offset);
         
-        // Filter by port if specified
         if(target_port_ > 0)
         {
           uint16_t src_port = ntohs(tcp_header->source);
@@ -350,18 +542,15 @@ namespace novatel_oem7_driver
         size_t tcp_header_len = tcp_header->doff * 4;
         offset += tcp_header_len;
       }
-      else // UDP
+      else
       {
-        // Check for UDP header
         if(packet_len < offset + sizeof(struct udphdr))
         {
           return nullptr;
         }
 
-        // Parse UDP header
         struct udphdr* udp_header = (struct udphdr*)(packet + offset);
         
-        // Filter by port if specified
         if(target_port_ > 0)
         {
           uint16_t src_port = ntohs(udp_header->source);
@@ -376,10 +565,9 @@ namespace novatel_oem7_driver
         offset += sizeof(struct udphdr);
       }
 
-      // Calculate payload size
       if(packet_len <= offset)
       {
-        return nullptr; // No payload
+        return nullptr;
       }
 
       payload_size = packet_len - offset;
