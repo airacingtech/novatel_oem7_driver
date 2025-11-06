@@ -207,6 +207,36 @@ namespace novatel_oem7_driver
         "[SEEK] Seeking forward %.0fs to %.1fs", SEEK_INTERVAL_SECONDS, target_relative);
     }
 
+    bool seekToTimestamp(double target_absolute, double target_relative, 
+                         pcap_pkthdr** header, const uint8_t** packet_data)
+    {
+      int result;
+      while(running_ && (result = pcap_next_ex(pcap_handle_, header, packet_data)) >= 0)
+      {
+        if(result == 0) continue;
+        
+        double ts = (*header)->ts.tv_sec + (*header)->ts.tv_usec / 1000000.0;
+        
+        if(first_packet_)
+        {
+          first_pcap_timestamp_.store(ts);
+          first_packet_ = false;
+          target_absolute = first_pcap_timestamp_.load() + target_relative;
+        }
+        
+        if(ts >= target_absolute)
+        {
+          {
+            std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
+            last_packet_time_ = (*header)->ts;
+          }
+          RCLCPP_INFO(node_->get_logger(), "[SEEK] Jumped to %.1fs", target_relative);
+          return true;
+        }
+      }
+      return false;
+    }
+
     void keyboardInputThread()
     {
       if (tty_fd_ < 0)
@@ -219,12 +249,14 @@ namespace novatel_oem7_driver
         "=======================================================\n"
         "  PCAP Playback Controls:\n"
         "  SPACE     - Pause/Resume\n"
-        "  UP        - Increase speed (0.10x increments)\n"
-        "  DOWN      - Decrease speed (0.10x increments)\n"
-        "  LEFT (or ,)  - Seek backward 5 seconds\n"
-        "  RIGHT (or .) - Seek forward 5 seconds\n"
+        "  UP        - Increase speed (%.2fx increments)\n"
+        "  DOWN      - Decrease speed (%.2fx increments)\n"
+        "  LEFT (or ,)  - Seek backward %.0f seconds\n"
+        "  RIGHT (or .) - Seek forward %.0f seconds\n"
         "  q         - Quit\n"
-        "=======================================================\n");
+        "=======================================================\n",
+        SPEED_INCREMENT, SPEED_INCREMENT, 
+        SEEK_INTERVAL_SECONDS, SEEK_INTERVAL_SECONDS);
 
       while (running_)
       {
@@ -394,50 +426,18 @@ namespace novatel_oem7_driver
             stream_buffer_.clear();
             stream_buffer_pos_ = 0;
             
-            while(running_ && (result = pcap_next_ex(pcap_handle_, &header, &packet_data)) >= 0)
+            if(!seekToTimestamp(target_absolute, target_relative, &header, &packet_data))
             {
-              if(result == 0) continue;
-              
-              double ts = header->ts.tv_sec + header->ts.tv_usec / 1000000.0;
-              
-              if(first_packet_)
-              {
-                first_pcap_timestamp_.store(ts);
-                first_packet_ = false;
-                target_absolute = first_pcap_timestamp_.load() + target_relative;
-              }
-              
-              if(ts >= target_absolute)
-              {
-                current_pcap_timestamp = ts;
-                {
-                  std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
-                  last_packet_time_ = header->ts;
-                }
-                RCLCPP_INFO(node_->get_logger(), "[SEEK] Jumped to %.1fs", target_relative);
-                break;
-              }
+              return false;
             }
             continue;
           }
           
           if(target_absolute > current_pcap_timestamp)
           {
-            while(running_ && (result = pcap_next_ex(pcap_handle_, &header, &packet_data)) >= 0)
+            if(!seekToTimestamp(target_absolute, target_relative, &header, &packet_data))
             {
-              if(result == 0) continue;
-              
-              double ts = header->ts.tv_sec + header->ts.tv_usec / 1000000.0;
-              if(ts >= target_absolute)
-              {
-                current_pcap_timestamp = ts;
-                {
-                  std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
-                  last_packet_time_ = header->ts;
-                }
-                RCLCPP_INFO(node_->get_logger(), "[SEEK] Jumped to %.1fs", target_relative);
-                break;
-              }
+              return false;
             }
             continue;
           }
@@ -550,6 +550,10 @@ namespace novatel_oem7_driver
       size_t ip_header_len = ip_header->ihl * 4;
       offset += ip_header_len;
 
+      const struct tcphdr* tcp_header = nullptr;
+      const struct udphdr* udp_header = nullptr;
+      size_t transport_header_len = 0;
+
       if(ip_header->protocol == IPPROTO_TCP)
       {
         if(packet_len < offset + sizeof(struct tcphdr))
@@ -557,7 +561,7 @@ namespace novatel_oem7_driver
           return nullptr;
         }
 
-        const struct tcphdr* tcp_header = reinterpret_cast<const struct tcphdr*>(packet + offset);
+        tcp_header = reinterpret_cast<const struct tcphdr*>(packet + offset);
         
         if(target_port_ > 0)
         {
@@ -570,8 +574,8 @@ namespace novatel_oem7_driver
           }
         }
 
-        size_t tcp_header_len = tcp_header->doff * 4;
-        offset += tcp_header_len;
+        transport_header_len = tcp_header->doff * 4;
+        offset += transport_header_len;
       }
       else
       {
@@ -580,7 +584,7 @@ namespace novatel_oem7_driver
           return nullptr;
         }
 
-        const struct udphdr* udp_header = reinterpret_cast<const struct udphdr*>(packet + offset);
+        udp_header = reinterpret_cast<const struct udphdr*>(packet + offset);
         
         if(target_port_ > 0)
         {
@@ -593,28 +597,12 @@ namespace novatel_oem7_driver
           }
         }
 
-        offset += sizeof(struct udphdr);
+        transport_header_len = sizeof(struct udphdr);
+        offset += transport_header_len;
       }
 
       // Calculate payload size from IP header length fields with underflow protection
-      size_t ip_header_len = ip_header->ihl * 4;
-      size_t transport_header_len = 0;
-      
-      if(ip_header->protocol == IPPROTO_TCP)
-      {
-        // Reuse validated TCP header from earlier
-        size_t tcp_offset = sizeof(struct ether_header) + ip_header_len;
-        if(packet_len < tcp_offset + sizeof(struct tcphdr))
-        {
-          return nullptr;
-        }
-        const struct tcphdr* tcp_header = reinterpret_cast<const struct tcphdr*>(packet + tcp_offset);
-        transport_header_len = tcp_header->doff * 4;
-      }
-      else
-      {
-        transport_header_len = sizeof(struct udphdr);
-      }
+      // Reuse ip_header_len and transport_header_len already calculated above
       
       // Validate ip_total_length before subtraction to prevent underflow
       size_t total_header_len = ip_header_len + transport_header_len;
