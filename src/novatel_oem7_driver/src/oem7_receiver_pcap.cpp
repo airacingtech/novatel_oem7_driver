@@ -43,6 +43,13 @@ namespace novatel_oem7_driver
 {
   class Oem7ReceiverPcap: public Oem7ReceiverIf
   {
+    // Playback control constants
+    static constexpr double SPEED_INCREMENT = 0.10;
+    static constexpr double MIN_PLAYBACK_SPEED = 0.10;
+    static constexpr double MAX_PLAYBACK_SPEED = 10.0;
+    static constexpr double SEEK_INTERVAL_SECONDS = 5.0;
+    static constexpr int KEYBOARD_POLL_INTERVAL_MS = 50;
+
     rclcpp::Node* node_;
 
     pcap_t* pcap_handle_;
@@ -215,7 +222,7 @@ namespace novatel_oem7_driver
                 {
                   case 'A': {
                     double current_speed = playback_speed_.load();
-                    double new_speed = std::min(current_speed + 0.10, 10.0);
+                    double new_speed = std::min(current_speed + SPEED_INCREMENT, MAX_PLAYBACK_SPEED);
                     playback_speed_.store(new_speed);
                     RCLCPP_INFO(node_->get_logger(), 
                       "[SPEED] Playback speed: %.2fx", new_speed);
@@ -223,7 +230,7 @@ namespace novatel_oem7_driver
                   }
                   case 'B': {
                     double current_speed = playback_speed_.load();
-                    double new_speed = std::max(current_speed - 0.10, 0.10);
+                    double new_speed = std::max(current_speed - SPEED_INCREMENT, MIN_PLAYBACK_SPEED);
                     playback_speed_.store(new_speed);
                     RCLCPP_INFO(node_->get_logger(), 
                       "[SPEED] Playback speed: %.2fx", new_speed);
@@ -235,11 +242,11 @@ namespace novatel_oem7_driver
                       std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
                       current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_.load();
                     }
-                    double target_relative = std::max(0.0, current_relative - 5.0);
+                    double target_relative = std::max(0.0, current_relative - SEEK_INTERVAL_SECONDS);
                     seek_target_.store(target_relative);
                     seek_requested_.store(true);
                     RCLCPP_INFO(node_->get_logger(), 
-                      "[SEEK] Seeking backward 5s to %.1fs", target_relative);
+                      "[SEEK] Seeking backward %.0fs to %.1fs", SEEK_INTERVAL_SECONDS, target_relative);
                     break;
                   }
                   case 'C': {
@@ -248,11 +255,11 @@ namespace novatel_oem7_driver
                       std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
                       current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_.load();
                     }
-                    double target_relative = current_relative + 5.0;
+                    double target_relative = current_relative + SEEK_INTERVAL_SECONDS;
                     seek_target_.store(target_relative);
                     seek_requested_.store(true);
                     RCLCPP_INFO(node_->get_logger(), 
-                      "[SEEK] Seeking forward 5s to %.1fs", target_relative);
+                      "[SEEK] Seeking forward %.0fs to %.1fs", SEEK_INTERVAL_SECONDS, target_relative);
                     break;
                   }
                 }
@@ -272,11 +279,11 @@ namespace novatel_oem7_driver
               std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
               current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_.load();
             }
-            double target_relative = std::max(0.0, current_relative - 5.0);
+            double target_relative = std::max(0.0, current_relative - SEEK_INTERVAL_SECONDS);
             seek_target_.store(target_relative);
             seek_requested_.store(true);
             RCLCPP_INFO(node_->get_logger(), 
-              "[SEEK] Seeking backward 5s to %.1fs", target_relative);
+              "[SEEK] Seeking backward %.0fs to %.1fs", SEEK_INTERVAL_SECONDS, target_relative);
           }
           else if (c == '>' || c == '.')
           {
@@ -285,14 +292,14 @@ namespace novatel_oem7_driver
               std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
               current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_.load();
             }
-            double target_relative = current_relative + 5.0;
+            double target_relative = current_relative + SEEK_INTERVAL_SECONDS;
             seek_target_.store(target_relative);
             seek_requested_.store(true);
             RCLCPP_INFO(node_->get_logger(), 
-              "[SEEK] Seeking forward 5s to %.1fs", target_relative);
+              "[SEEK] Seeking forward %.0fs to %.1fs", SEEK_INTERVAL_SECONDS, target_relative);
           }
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::this_thread::sleep_for(std::chrono::milliseconds(KEYBOARD_POLL_INTERVAL_MS));
       }
     }
 
@@ -507,7 +514,7 @@ namespace novatel_oem7_driver
         return nullptr;
       }
 
-      struct ether_header* eth_header = reinterpret_cast<struct ether_header*>(const_cast<uint8_t*>(packet));
+      const struct ether_header* eth_header = reinterpret_cast<const struct ether_header*>(packet);
       uint16_t ether_type = ntohs(eth_header->ether_type);
       size_t offset = sizeof(struct ether_header);
 
@@ -521,7 +528,7 @@ namespace novatel_oem7_driver
         return nullptr;
       }
 
-      struct iphdr* ip_header = reinterpret_cast<struct iphdr*>(const_cast<uint8_t*>(packet + offset));
+      const struct iphdr* ip_header = reinterpret_cast<const struct iphdr*>(packet + offset);
       uint16_t ip_total_length = ntohs(ip_header->tot_len);
       
       if(ip_header->protocol != IPPROTO_TCP && ip_header->protocol != IPPROTO_UDP)
@@ -558,7 +565,7 @@ namespace novatel_oem7_driver
           return nullptr;
         }
 
-        struct tcphdr* tcp_header = reinterpret_cast<struct tcphdr*>(const_cast<uint8_t*>(packet + offset));
+        const struct tcphdr* tcp_header = reinterpret_cast<const struct tcphdr*>(packet + offset);
         
         if(target_port_ > 0)
         {
@@ -581,7 +588,7 @@ namespace novatel_oem7_driver
           return nullptr;
         }
 
-        struct udphdr* udp_header = reinterpret_cast<struct udphdr*>(const_cast<uint8_t*>(packet + offset));
+        const struct udphdr* udp_header = reinterpret_cast<const struct udphdr*>(packet + offset);
         
         if(target_port_ > 0)
         {
@@ -597,12 +604,14 @@ namespace novatel_oem7_driver
         offset += sizeof(struct udphdr);
       }
 
-      size_t ip_payload_offset = sizeof(struct ether_header) + (ip_header->ihl * 4);
+      // Calculate payload size from IP header length fields
       payload_size = ip_total_length - (ip_header->ihl * 4);
       
       if(ip_header->protocol == IPPROTO_TCP)
       {
-        struct tcphdr* tcp_header = reinterpret_cast<struct tcphdr*>(const_cast<uint8_t*>(packet + ip_payload_offset));
+        // Get TCP header from earlier offset calculation (not ip_payload_offset)
+        size_t tcp_offset = sizeof(struct ether_header) + (ip_header->ihl * 4);
+        const struct tcphdr* tcp_header = reinterpret_cast<const struct tcphdr*>(packet + tcp_offset);
         payload_size -= (tcp_header->doff * 4);
       }
       else
@@ -610,7 +619,8 @@ namespace novatel_oem7_driver
         payload_size -= sizeof(struct udphdr);
       }
 
-      if(payload_size == 0)
+      // Guard against truncated PCAP frames or malformed headers
+      if(payload_size == 0 || offset + payload_size > packet_len)
       {
         return nullptr;
       }
