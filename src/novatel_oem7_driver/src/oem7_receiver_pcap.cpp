@@ -468,7 +468,6 @@ namespace novatel_oem7_driver
             std::this_thread::sleep_for(std::chrono::microseconds(sleep_usec));
           }
           
-          first_packet_ = false;
           num_packets_processed_++;
           
           if(payload_size <= bytes_to_read)
