@@ -37,6 +37,7 @@
 #include <termios.h>
 #include <thread>
 #include <atomic>
+#include <mutex>
 
 namespace novatel_oem7_driver
 {
@@ -58,7 +59,8 @@ namespace novatel_oem7_driver
 
     bool first_packet_;
     struct timeval last_packet_time_;
-    double first_pcap_timestamp_;
+    std::mutex last_packet_time_mutex_;
+    std::atomic<double> first_pcap_timestamp_;
     
     std::atomic<bool> paused_;
     std::atomic<double> playback_speed_;
@@ -165,7 +167,7 @@ namespace novatel_oem7_driver
       if (tty_fd_ >= 0)
       {
         tcsetattr(tty_fd_, TCSANOW, &orig_termios_);
-        close(tty_fd_);
+        ::close(tty_fd_);
         tty_fd_ = -1;
       }
     }
@@ -228,7 +230,11 @@ namespace novatel_oem7_driver
                     break;
                   }
                   case 'D': {
-                    double current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_;
+                    double current_relative;
+                    {
+                      std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
+                      current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_.load();
+                    }
                     double target_relative = std::max(0.0, current_relative - 5.0);
                     seek_target_.store(target_relative);
                     seek_requested_.store(true);
@@ -237,7 +243,11 @@ namespace novatel_oem7_driver
                     break;
                   }
                   case 'C': {
-                    double current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_;
+                    double current_relative;
+                    {
+                      std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
+                      current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_.load();
+                    }
                     double target_relative = current_relative + 5.0;
                     seek_target_.store(target_relative);
                     seek_requested_.store(true);
@@ -257,7 +267,11 @@ namespace novatel_oem7_driver
           }
           else if (c == '<' || c == ',')
           {
-            double current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_;
+            double current_relative;
+            {
+              std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
+              current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_.load();
+            }
             double target_relative = std::max(0.0, current_relative - 5.0);
             seek_target_.store(target_relative);
             seek_requested_.store(true);
@@ -266,7 +280,11 @@ namespace novatel_oem7_driver
           }
           else if (c == '>' || c == '.')
           {
-            double current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_;
+            double current_relative;
+            {
+              std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
+              current_relative = (last_packet_time_.tv_sec + last_packet_time_.tv_usec / 1000000.0) - first_pcap_timestamp_.load();
+            }
             double target_relative = current_relative + 5.0;
             seek_target_.store(target_relative);
             seek_requested_.store(true);
@@ -351,14 +369,14 @@ namespace novatel_oem7_driver
         
         if(first_packet_)
         {
-          first_pcap_timestamp_ = current_pcap_timestamp;
+          first_pcap_timestamp_.store(current_pcap_timestamp);
           first_packet_ = false;
         }
         
         if(seek_requested_.load())
         {
           double target_relative = seek_target_.load();
-          double target_absolute = first_pcap_timestamp_ + target_relative;
+          double target_absolute = first_pcap_timestamp_.load() + target_relative;
           seek_requested_.store(false);
           
           if(target_absolute < current_pcap_timestamp)
@@ -385,15 +403,18 @@ namespace novatel_oem7_driver
               
               if(first_packet_)
               {
-                first_pcap_timestamp_ = ts;
+                first_pcap_timestamp_.store(ts);
                 first_packet_ = false;
-                target_absolute = first_pcap_timestamp_ + target_relative;
+                target_absolute = first_pcap_timestamp_.load() + target_relative;
               }
               
               if(ts >= target_absolute)
               {
                 current_pcap_timestamp = ts;
-                last_packet_time_ = header->ts;
+                {
+                  std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
+                  last_packet_time_ = header->ts;
+                }
                 RCLCPP_INFO(node_->get_logger(), "[SEEK] Jumped to %.1fs", target_relative);
                 break;
               }
@@ -411,7 +432,10 @@ namespace novatel_oem7_driver
               if(ts >= target_absolute)
               {
                 current_pcap_timestamp = ts;
-                last_packet_time_ = header->ts;
+                {
+                  std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
+                  last_packet_time_ = header->ts;
+                }
                 RCLCPP_INFO(node_->get_logger(), "[SEEK] Jumped to %.1fs", target_relative);
                 break;
               }
@@ -425,21 +449,25 @@ namespace novatel_oem7_driver
         
         if(payload && payload_size > 0)
         {
-          if(!first_packet_ && last_packet_time_.tv_sec != 0)
+          long delta_total_usec = 0;
           {
-            long delta_sec = header->ts.tv_sec - last_packet_time_.tv_sec;
-            long delta_usec = header->ts.tv_usec - last_packet_time_.tv_usec;
-            long delta_total_usec = delta_sec * 1000000 + delta_usec;
-            
-            if(delta_total_usec > 0)
+            std::lock_guard<std::mutex> lock(last_packet_time_mutex_);
+            if(last_packet_time_.tv_sec != 0)
             {
-              double current_speed = playback_speed_.load();
-              long sleep_usec = static_cast<long>(delta_total_usec / current_speed);
-              usleep(sleep_usec);
+              long delta_sec = header->ts.tv_sec - last_packet_time_.tv_sec;
+              long delta_usec = header->ts.tv_usec - last_packet_time_.tv_usec;
+              delta_total_usec = delta_sec * 1000000 + delta_usec;
             }
+            last_packet_time_ = header->ts;
           }
           
-          last_packet_time_ = header->ts;
+          if(delta_total_usec > 0)
+          {
+            double current_speed = playback_speed_.load();
+            long sleep_usec = static_cast<long>(delta_total_usec / current_speed);
+            std::this_thread::sleep_for(std::chrono::microseconds(sleep_usec));
+          }
+          
           first_packet_ = false;
           num_packets_processed_++;
           
@@ -480,7 +508,7 @@ namespace novatel_oem7_driver
         return nullptr;
       }
 
-      struct ether_header* eth_header = (struct ether_header*)packet;
+      struct ether_header* eth_header = reinterpret_cast<struct ether_header*>(const_cast<uint8_t*>(packet));
       uint16_t ether_type = ntohs(eth_header->ether_type);
       size_t offset = sizeof(struct ether_header);
 
@@ -494,7 +522,8 @@ namespace novatel_oem7_driver
         return nullptr;
       }
 
-      struct iphdr* ip_header = (struct iphdr*)(packet + offset);
+      struct iphdr* ip_header = reinterpret_cast<struct iphdr*>(const_cast<uint8_t*>(packet + offset));
+      uint16_t ip_total_length = ntohs(ip_header->tot_len);
       
       if(ip_header->protocol != IPPROTO_TCP && ip_header->protocol != IPPROTO_UDP)
       {
@@ -507,8 +536,12 @@ namespace novatel_oem7_driver
         src_addr.s_addr = ip_header->saddr;
         dst_addr.s_addr = ip_header->daddr;
         
-        std::string src_ip = inet_ntoa(src_addr);
-        std::string dst_ip = inet_ntoa(dst_addr);
+        char src_ip_buf[INET_ADDRSTRLEN];
+        char dst_ip_buf[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &src_addr, src_ip_buf, INET_ADDRSTRLEN);
+        inet_ntop(AF_INET, &dst_addr, dst_ip_buf, INET_ADDRSTRLEN);
+        std::string src_ip(src_ip_buf);
+        std::string dst_ip(dst_ip_buf);
         
         if(src_ip != target_ip_ && dst_ip != target_ip_)
         {
@@ -526,7 +559,7 @@ namespace novatel_oem7_driver
           return nullptr;
         }
 
-        struct tcphdr* tcp_header = (struct tcphdr*)(packet + offset);
+        struct tcphdr* tcp_header = reinterpret_cast<struct tcphdr*>(const_cast<uint8_t*>(packet + offset));
         
         if(target_port_ > 0)
         {
@@ -549,7 +582,7 @@ namespace novatel_oem7_driver
           return nullptr;
         }
 
-        struct udphdr* udp_header = (struct udphdr*)(packet + offset);
+        struct udphdr* udp_header = reinterpret_cast<struct udphdr*>(const_cast<uint8_t*>(packet + offset));
         
         if(target_port_ > 0)
         {
@@ -565,12 +598,24 @@ namespace novatel_oem7_driver
         offset += sizeof(struct udphdr);
       }
 
-      if(packet_len <= offset)
+      size_t ip_payload_offset = sizeof(struct ether_header) + (ip_header->ihl * 4);
+      payload_size = ip_total_length - (ip_header->ihl * 4);
+      
+      if(ip_header->protocol == IPPROTO_TCP)
+      {
+        struct tcphdr* tcp_header = reinterpret_cast<struct tcphdr*>(const_cast<uint8_t*>(packet + ip_payload_offset));
+        payload_size -= (tcp_header->doff * 4);
+      }
+      else
+      {
+        payload_size -= sizeof(struct udphdr);
+      }
+
+      if(payload_size == 0)
       {
         return nullptr;
       }
 
-      payload_size = packet_len - offset;
       return packet + offset;
     }
   };
