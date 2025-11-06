@@ -23,6 +23,8 @@ find_package(Boost  			REQUIRED)
 LIST(APPEND CMAKE_MODULE_PATH "/usr/share/cmake/geographiclib")
 
 find_package(GeographicLib REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PCAP REQUIRED libpcap)
 
 # Make package available as a macro to C++
 add_definitions("-D${PROJECT_NAME}_VERSION=\"${${PROJECT_NAME}_VERSION}\"")
@@ -62,6 +64,7 @@ include_directories(include
     ${CMAKE_BINARY_DIR}/usr/include/novatel/edie           
     ${OEM7_DECODER_DIR}/bin/Novatel/api/
     ${OEM7_DECODER_DIR}/bin/StreamInterface/api/
+    ${PCAP_INCLUDE_DIRS}
 )
 
 ## All components are plugins
@@ -69,6 +72,7 @@ add_library(${PROJECT_NAME} SHARED
    src/oem7_receiver_net.cpp
    src/oem7_receiver_port.cpp
    src/oem7_receiver_file.cpp
+   src/oem7_receiver_pcap.cpp
    src/oem7_message_decoder.cpp
    src/oem7_message_decoder_lib.cpp
    src/oem7_message_util.cpp
@@ -100,6 +104,7 @@ message("Linking to EDIE at: '${CMAKE_BINARY_DIR}'")
 target_link_libraries(${PROJECT_NAME}
    Boost::boost
    ${GeographicLib_LIBRARIES}
+   ${PCAP_LIBRARIES}
    ${CMAKE_BINARY_DIR}/usr/lib/libCommon.a
    ${CMAKE_BINARY_DIR}/usr/lib/libStreamInterface.a
    ${CMAKE_BINARY_DIR}/usr/lib/libNovatel.a

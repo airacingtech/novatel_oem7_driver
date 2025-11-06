@@ -18,6 +18,12 @@
         </description>
     </class>
 
+    <class name="Oem7ReceiverPcap" type="novatel_oem7_driver::Oem7ReceiverPcap" base_class_type="novatel_oem7_driver::Oem7ReceiverIf">
+        <description>
+            PCAP file replay for Oem7 receiver.
+        </description>
+    </class>
+
     <class name="Oem7ReceiverPort" type="novatel_oem7_driver::Oem7ReceiverPort" base_class_type="novatel_oem7_driver::Oem7ReceiverIf">
         <description>
             Oem7 Receiver serial port interface
