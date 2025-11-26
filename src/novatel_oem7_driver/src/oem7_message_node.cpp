@@ -31,8 +31,8 @@
 
 #include <boost/asio.hpp>
 
-#include "novatel_oem7_msgs/srv/oem7_abascii_cmd.hpp"
-#include "novatel_oem7_msgs/msg/oem7_raw_msg.h"
+#include "art_novatel_oem7_msgs/srv/oem7_abascii_cmd.hpp"
+#include "art_novatel_oem7_msgs/msg/oem7_raw_msg.h"
 
 #include <pluginlib/class_loader.hpp>
 
@@ -45,7 +45,7 @@
 #include <message_handler.hpp>
 #include <driver_parameter.hpp>
 
-#include "novatel_oem7_msgs/msg/oem7_header.hpp"
+#include "art_novatel_oem7_msgs/msg/oem7_header.hpp"
 
 
 namespace novatel_oem7_driver
@@ -75,14 +75,14 @@ namespace novatel_oem7_driver
 
     double publish_delay_sec_; ///< Delay after publishing each message; used to throttle output with static data sources.
 
-    Oem7RosPublisher<novatel_oem7_msgs::msg::Oem7RawMsg> oem7rawmsg_pub_; ///< Publishes raw Oem7 messages.
+    Oem7RosPublisher<art_novatel_oem7_msgs::msg::Oem7RawMsg> oem7rawmsg_pub_; ///< Publishes raw Oem7 messages.
     bool publish_unknown_oem7raw_; ///< Publish all unknown messages to 'Oem7Raw'
 
 
     rclcpp::CallbackGroup::SharedPtr msg_service_cb_grp_; ///< Message service callbacks
     rclcpp::CallbackGroup::SharedPtr cmd_service_cb_grp_; ///< Command service callbacks
 
-    rclcpp::Service<novatel_oem7_msgs::srv::Oem7AbasciiCmd>::SharedPtr oem7_abascii_cmd_srv_;
+    rclcpp::Service<art_novatel_oem7_msgs::srv::Oem7AbasciiCmd>::SharedPtr oem7_abascii_cmd_srv_;
 
     // Command service
 
@@ -218,8 +218,8 @@ namespace novatel_oem7_driver
      */
     void
     serviceOem7AbasciiCb(
-          const std::shared_ptr<novatel_oem7_msgs::srv::Oem7AbasciiCmd::Request>  req,
-                std::shared_ptr<novatel_oem7_msgs::srv::Oem7AbasciiCmd::Response> rsp)
+          const std::shared_ptr<art_novatel_oem7_msgs::srv::Oem7AbasciiCmd::Request>  req,
+                std::shared_ptr<art_novatel_oem7_msgs::srv::Oem7AbasciiCmd::Response> rsp)
     {
       issueOem7AbasciiCmd(req->cmd, rsp->rsp);
     }
@@ -311,7 +311,7 @@ namespace novatel_oem7_driver
 
     void publishOem7RawMsg(Oem7RawMessageIf::ConstPtr raw_msg)
     {
-        novatel_oem7_msgs::msg::Oem7RawMsg::SharedPtr oem7_raw_msg = std::make_shared<novatel_oem7_msgs::msg::Oem7RawMsg>();
+        art_novatel_oem7_msgs::msg::Oem7RawMsg::SharedPtr oem7_raw_msg = std::make_shared<art_novatel_oem7_msgs::msg::Oem7RawMsg>();
         oem7_raw_msg->message_data.insert(
                                         oem7_raw_msg->message_data.end(),
                                         raw_msg->getMessageData(0),
@@ -463,7 +463,7 @@ namespace novatel_oem7_driver
       // Now that all internal init commands have been issued, allow external commands:
       static rmw_qos_profile_t qos = rmw_qos_profile_default;
       qos.depth = 20;
-      oem7_abascii_cmd_srv_ = create_service<novatel_oem7_msgs::srv::Oem7AbasciiCmd>(
+      oem7_abascii_cmd_srv_ = create_service<art_novatel_oem7_msgs::srv::Oem7AbasciiCmd>(
                                "Oem7Cmd",
                                std::bind(
                                       &Oem7MessageNode::serviceOem7AbasciiCb,

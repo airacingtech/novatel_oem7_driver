@@ -33,9 +33,9 @@
 
 #include <oem7_ros_publisher.hpp>
 
-#include "novatel_oem7_msgs/msg/range.hpp"
+#include "art_novatel_oem7_msgs/msg/range.hpp"
 
-using novatel_oem7_msgs::msg::RANGE;
+using art_novatel_oem7_msgs::msg::RANGE;
 
 
 namespace novatel_oem7_driver

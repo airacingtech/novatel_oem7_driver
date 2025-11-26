@@ -20,7 +20,7 @@
   <depend>sensor_msgs</depend>
   <depend>nmea_msgs</depend>
   <depend>nav_msgs</depend>
-  <depend>novatel_oem7_msgs</depend>
+  <depend>art_novatel_oem7_msgs</depend>
   <depend>tf2_geometry_msgs</depend>
   <depend>geographiclib</depend>
   <depend>backward_ros</depend>
