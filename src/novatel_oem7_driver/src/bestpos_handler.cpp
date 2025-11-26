@@ -233,8 +233,8 @@ namespace novatel_oem7_driver
     std::unique_ptr<Oem7RosPublisher<BESTPOS>>        BESTPOS_pub_;
     std::unique_ptr<Oem7RosPublisher<BESTVEL>>        BESTVEL_pub_;
     std::unique_ptr<Oem7RosPublisher<BESTUTM>>        BESTUTM_pub_;
-    std::unique_ptr<Oem7RosPublisher<BESTGNSSPOS>>    BESTGNSSPOS_pub_;
-    std::unique_ptr<Oem7RosPublisher<BESTGNSSVEL>>    BESTGNSSVEL_pub_;
+    std::unique_ptr<Oem7RosPublisher<BESTPOS>>        BESTGNSSPOS_pub_;
+    std::unique_ptr<Oem7RosPublisher<BESTVEL>>        BESTGNSSVEL_pub_;
     std::unique_ptr<Oem7RosPublisher<INSPVA>>         INSPVA_pub_;
 
     std::unique_ptr<Oem7RosPublisher<GPSFix>>         GPSFix_pub_;
@@ -326,14 +326,14 @@ namespace novatel_oem7_driver
 
     void publishBESTGNSSPOS(Oem7RawMessageIf::ConstPtr msg)
     {
-        std::shared_ptr<novatel_oem7_msgs::msg::BESTGNSSPOS> bestgnsspos;
+        std::shared_ptr<novatel_oem7_msgs::msg::BESTPOS> bestgnsspos;
         MakeROSMessage(msg, bestgnsspos);
         BESTGNSSPOS_pub_->publish(bestgnsspos);
     }
 
     void publishBESTGNSSVEL(Oem7RawMessageIf::ConstPtr msg)
     {
-        std::shared_ptr<novatel_oem7_msgs::msg::BESTGNSSVEL> bestgnssvel;
+        std::shared_ptr<novatel_oem7_msgs::msg::BESTVEL> bestgnssvel;
         MakeROSMessage(msg, bestgnssvel);
         BESTGNSSVEL_pub_->publish(bestgnssvel);
     }
@@ -737,8 +737,8 @@ namespace novatel_oem7_driver
       BESTPOS_pub_      = std::make_unique<Oem7RosPublisher<BESTPOS>>(      "BESTPOS",       node);
       BESTVEL_pub_      = std::make_unique<Oem7RosPublisher<BESTVEL>>(      "BESTVEL",       node);
       BESTUTM_pub_      = std::make_unique<Oem7RosPublisher<BESTUTM>>(      "BESTUTM",       node);
-      BESTGNSSPOS_pub_  = std::make_unique<Oem7RosPublisher<BESTGNSSPOS>>(  "BESTGNSSPOS",   node);
-      BESTGNSSVEL_pub_  = std::make_unique<Oem7RosPublisher<BESTGNSSVEL>>(  "BESTGNSSVEL",   node);
+      BESTGNSSPOS_pub_  = std::make_unique<Oem7RosPublisher<BESTPOS>>(      "BESTGNSSPOS",   node);
+      BESTGNSSVEL_pub_  = std::make_unique<Oem7RosPublisher<BESTVEL>>(      "BESTGNSSVEL",   node);
       INSPVA_pub_       = std::make_unique<Oem7RosPublisher<INSPVA>>(       "INSPVA",        node);
 
       GPSFix_pub_    = std::make_unique<Oem7RosPublisher<GPSFix>>(   "GPSFix",       node);
