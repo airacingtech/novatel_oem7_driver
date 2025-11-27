@@ -58,7 +58,7 @@ namespace novatel_oem7_driver
    */
   void getOem7Header(
       const Oem7RawMessageIf::ConstPtr& raw_msg,
-      novatel_oem7_msgs::msg::Oem7Header& hdr
+      art_novatel_oem7_msgs::msg::Oem7Header& hdr
       )
   {
     const Oem7MessageHeaderMem* hdr_mem = reinterpret_cast<const Oem7MessageHeaderMem*>(raw_msg->getMessageData(0));
@@ -75,13 +75,13 @@ namespace novatel_oem7_driver
 
   void getOem7ShortHeader(
       const Oem7RawMessageIf::ConstPtr& raw_msg,  ///< [in] Raw binary message
-      novatel_oem7_msgs::msg::Oem7Header& hdr     ///< [out] Oem7 Message Header
+      art_novatel_oem7_msgs::msg::Oem7Header& hdr     ///< [out] Oem7 Message Header
       )
   {
     const Oem7MessgeShortHeaderMem* hdr_mem = reinterpret_cast<const Oem7MessgeShortHeaderMem*>(raw_msg->getMessageData(0));
 
     hdr.message_id             = hdr_mem->message_id;
-    hdr.message_type           = novatel_oem7_msgs::msg::Oem7Header::OEM7MSGTYPE_LOG; // Always log
+    hdr.message_type           = art_novatel_oem7_msgs::msg::Oem7Header::OEM7MSGTYPE_LOG; // Always log
     hdr.sequence_number        = 0; // Not available; assume it's a single log.
     hdr.time_status            = GPS_REFTIME_STATUS_UNKNOWN;
     hdr.gps_week_number        = hdr_mem->gps_week;

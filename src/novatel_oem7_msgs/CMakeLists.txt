@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(novatel_oem7_msgs)
+project(art_novatel_oem7_msgs)
 
 
 set(CMAKE_CXX_STANDARD 17)

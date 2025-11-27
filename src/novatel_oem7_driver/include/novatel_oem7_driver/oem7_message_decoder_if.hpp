@@ -33,7 +33,7 @@
 #include <oem7_raw_message_if.hpp>
 #include <novatel_oem7_driver/oem7_receiver_if.hpp>
 
-#include "novatel_oem7_msgs/msg/oem7_raw_msg.hpp"
+#include "art_novatel_oem7_msgs/msg/oem7_raw_msg.hpp"
 
 #include <rclcpp/rclcpp.hpp>
 

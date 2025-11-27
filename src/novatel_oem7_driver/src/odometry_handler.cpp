@@ -40,8 +40,8 @@
 #include "gps_msgs/msg/gps_fix.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 
-#include "novatel_oem7_msgs/msg/inspva.hpp"
-#include "novatel_oem7_msgs/msg/inspvax.hpp"
+#include "art_novatel_oem7_msgs/msg/inspva.hpp"
+#include "art_novatel_oem7_msgs/msg/inspvax.hpp"
 
 #include <GeographicLib/UTMUPS.hpp>
 
@@ -51,8 +51,8 @@ using gps_msgs::msg::GPSFix;
 using gps_msgs::msg::GPSStatus;
 using nav_msgs::msg::Odometry;
 
-using novatel_oem7_msgs::msg::INSPVA;
-using novatel_oem7_msgs::msg::INSPVAX;
+using art_novatel_oem7_msgs::msg::INSPVA;
+using art_novatel_oem7_msgs::msg::INSPVAX;
 
 using tf2_ros::TransformBroadcaster;
 
