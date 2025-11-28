@@ -130,7 +130,7 @@ MakeROSMessage<art_novatel_oem7_msgs::msg::BESTPOS>(
     const Oem7RawMessageIf::ConstPtr& msg,
     std::shared_ptr<art_novatel_oem7_msgs::msg::BESTPOS>& bestpos)
 {
-  assert(msg->getMessageId() == BESTPOS_OEM7_MSGID);
+  assert(msg->getMessageId() == BESTGNSSPOS_OEM7_MSGID);
 
   const BESTPOSMem* bp = reinterpret_cast<const BESTPOSMem*>(msg->getMessageData(OEM7_BINARY_MSG_HDR_LEN));
   bestpos.reset(new art_novatel_oem7_msgs::msg::BESTPOS);
@@ -167,7 +167,7 @@ MakeROSMessage<art_novatel_oem7_msgs::msg::BESTVEL>(
     const Oem7RawMessageIf::ConstPtr& msg,
     std::shared_ptr<art_novatel_oem7_msgs::msg::BESTVEL>& bestvel)
 {
-  assert(msg->getMessageId() == BESTVEL_OEM7_MSGID);
+  assert(msg->getMessageId() == BESTGNSSVEL_OEM7_MSGID);
 
   const BESTVELMem* bv = reinterpret_cast<const BESTVELMem*>(msg->getMessageData(OEM7_BINARY_MSG_HDR_LEN));
   bestvel.reset(new art_novatel_oem7_msgs::msg::BESTVEL);
