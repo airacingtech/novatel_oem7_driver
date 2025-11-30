@@ -29,17 +29,17 @@
 
 #include <novatel_oem7_driver/oem7_ros_messages.hpp>
 
-#include "art_novatel_oem7_msgs/msg/time.hpp"
+#include "novatel_oem7_msgs/msg/time.hpp"
 
 namespace novatel_oem7_driver
 {
   class TimeHandler: public Oem7MessageHandlerIf
   {
-    std::unique_ptr<Oem7RosPublisher<art_novatel_oem7_msgs::msg::TIME>> TIME_pub_;
+    std::unique_ptr<Oem7RosPublisher<novatel_oem7_msgs::msg::TIME>> TIME_pub_;
 
     void publishTIME(Oem7RawMessageIf::ConstPtr msg)
     {
-      std::shared_ptr<art_novatel_oem7_msgs::msg::TIME> time;
+      std::shared_ptr<novatel_oem7_msgs::msg::TIME> time;
       MakeROSMessage(msg, time);
       TIME_pub_->publish(time);
     }
@@ -55,7 +55,7 @@ namespace novatel_oem7_driver
 
     void initialize(rclcpp::Node& node)
     {
-      TIME_pub_ = std::make_unique<Oem7RosPublisher<art_novatel_oem7_msgs::msg::TIME>>("TIME", node);
+      TIME_pub_ = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::TIME>>("TIME", node);
     }
 
     const MessageIdRecords& getMessageIds()

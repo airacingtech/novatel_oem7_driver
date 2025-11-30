@@ -31,9 +31,9 @@
 
 #include <novatel_oem7_driver/oem7_ros_messages.hpp>
 
-#include "art_novatel_oem7_msgs/msg/rxstatus.hpp"
-#include "art_novatel_oem7_msgs/msg/terrastarinfo.hpp"
-#include "art_novatel_oem7_msgs/msg/terrastarstatus.hpp"
+#include "novatel_oem7_msgs/msg/rxstatus.hpp"
+#include "novatel_oem7_msgs/msg/terrastarinfo.hpp"
+#include "novatel_oem7_msgs/msg/terrastarstatus.hpp"
 
 
 namespace novatel_oem7_driver
@@ -334,9 +334,9 @@ namespace novatel_oem7_driver
   /*** Handles RXSTATUS messages */
   class ReceiverStatusHandler: public Oem7MessageHandlerIf
   {
-    std::unique_ptr<Oem7RosPublisher<art_novatel_oem7_msgs::msg::RXSTATUS>>         RXSTATUS_pub_;
-    std::unique_ptr<Oem7RosPublisher<art_novatel_oem7_msgs::msg::TERRASTARINFO>>    TSTInfo_pub_;
-    std::unique_ptr<Oem7RosPublisher<art_novatel_oem7_msgs::msg::TERRASTARSTATUS>>  TSTStatus_pub_;
+    std::unique_ptr<Oem7RosPublisher<novatel_oem7_msgs::msg::RXSTATUS>>         RXSTATUS_pub_;
+    std::unique_ptr<Oem7RosPublisher<novatel_oem7_msgs::msg::TERRASTARINFO>>    TSTInfo_pub_;
+    std::unique_ptr<Oem7RosPublisher<novatel_oem7_msgs::msg::TERRASTARSTATUS>>  TSTStatus_pub_;
 
     std::string frame_id_;
 
@@ -353,9 +353,9 @@ namespace novatel_oem7_driver
       assert(AUX4_STATUS_STRS.size()    == NUM_BITS);
 
 
-      RXSTATUS_pub_  = std::make_unique<Oem7RosPublisher<art_novatel_oem7_msgs::msg::RXSTATUS>>(       "RXSTATUS",        node);
-      TSTInfo_pub_   = std::make_unique<Oem7RosPublisher<art_novatel_oem7_msgs::msg::TERRASTARINFO>>(  "TERRASTARINFO",   node);
-      TSTStatus_pub_ = std::make_unique<Oem7RosPublisher<art_novatel_oem7_msgs::msg::TERRASTARSTATUS>>("TERRASTARSTATUS", node);
+      RXSTATUS_pub_  = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::RXSTATUS>>(       "RXSTATUS",        node);
+      TSTInfo_pub_   = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::TERRASTARINFO>>(  "TERRASTARINFO",   node);
+      TSTStatus_pub_ = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::TERRASTARSTATUS>>("TERRASTARSTATUS", node);
     }
 
     const MessageIdRecords& getMessageIds()
@@ -372,7 +372,7 @@ namespace novatel_oem7_driver
 
     void publishRXSTATUS(Oem7RawMessageIf::ConstPtr msg)
     {
-      std::shared_ptr<art_novatel_oem7_msgs::msg::RXSTATUS> rxstatus;
+      std::shared_ptr<novatel_oem7_msgs::msg::RXSTATUS> rxstatus;
       MakeROSMessage(msg, rxstatus);
 
       // Populate status strings:
@@ -389,14 +389,14 @@ namespace novatel_oem7_driver
 
     void publishTERRASTARINFO(Oem7RawMessageIf::ConstPtr msg)
     {
-        std::shared_ptr<art_novatel_oem7_msgs::msg::TERRASTARINFO> terrastarinfo;
+        std::shared_ptr<novatel_oem7_msgs::msg::TERRASTARINFO> terrastarinfo;
         MakeROSMessage(msg, terrastarinfo);
         TSTInfo_pub_->publish(terrastarinfo);
     }
 
     void publishTERRASTARSTATUS(Oem7RawMessageIf::ConstPtr msg)
     {
-        std::shared_ptr<art_novatel_oem7_msgs::msg::TERRASTARSTATUS> terrastarstatus;
+        std::shared_ptr<novatel_oem7_msgs::msg::TERRASTARSTATUS> terrastarstatus;
         MakeROSMessage(msg, terrastarstatus);
         TSTStatus_pub_->publish(terrastarstatus);
     }

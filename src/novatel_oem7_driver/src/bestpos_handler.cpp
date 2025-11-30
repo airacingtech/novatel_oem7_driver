@@ -31,16 +31,16 @@
 #include <oem7_ros_publisher.hpp>
 #include <driver_parameter.hpp>
 
-#include "art_novatel_oem7_msgs/msg/solution_status.hpp"
-#include "art_novatel_oem7_msgs/msg/position_or_velocity_type.hpp"
-#include "art_novatel_oem7_msgs/msg/ppppos.hpp"
-#include "art_novatel_oem7_msgs/msg/bestpos.hpp"
-#include "art_novatel_oem7_msgs/msg/bestutm.hpp"
-#include "art_novatel_oem7_msgs/msg/bestvel.hpp"
-#include "art_novatel_oem7_msgs/msg/bestgnsspos.hpp"
-#include "art_novatel_oem7_msgs/msg/bestgnssvel.hpp"
-#include "art_novatel_oem7_msgs/msg/inspva.hpp"
-#include "art_novatel_oem7_msgs/msg/inspvax.hpp"
+#include "novatel_oem7_msgs/msg/solution_status.hpp"
+#include "novatel_oem7_msgs/msg/position_or_velocity_type.hpp"
+#include "novatel_oem7_msgs/msg/ppppos.hpp"
+#include "novatel_oem7_msgs/msg/bestpos.hpp"
+#include "novatel_oem7_msgs/msg/bestutm.hpp"
+#include "novatel_oem7_msgs/msg/bestvel.hpp"
+#include "novatel_oem7_msgs/msg/bestgnsspos.hpp"
+#include "novatel_oem7_msgs/msg/bestgnssvel.hpp"
+#include "novatel_oem7_msgs/msg/inspva.hpp"
+#include "novatel_oem7_msgs/msg/inspvax.hpp"
 
 #include "gps_msgs/msg/gps_fix.hpp"
 #include "sensor_msgs/msg/nav_sat_fix.hpp"
@@ -59,14 +59,14 @@ using gps_msgs::msg::GPSStatus;
 using sensor_msgs::msg::NavSatFix;
 using sensor_msgs::msg::NavSatStatus;
 
-using art_novatel_oem7_msgs::msg::PPPPOS;
-using art_novatel_oem7_msgs::msg::BESTPOS;
-using art_novatel_oem7_msgs::msg::BESTVEL;
-using art_novatel_oem7_msgs::msg::BESTUTM;
-using art_novatel_oem7_msgs::msg::BESTGNSSPOS;
-using art_novatel_oem7_msgs::msg::BESTGNSSVEL;
-using art_novatel_oem7_msgs::msg::INSPVA;
-using art_novatel_oem7_msgs::msg::INSPVAX;
+using novatel_oem7_msgs::msg::PPPPOS;
+using novatel_oem7_msgs::msg::BESTPOS;
+using novatel_oem7_msgs::msg::BESTVEL;
+using novatel_oem7_msgs::msg::BESTUTM;
+using novatel_oem7_msgs::msg::BESTGNSSPOS;
+using novatel_oem7_msgs::msg::BESTGNSSVEL;
+using novatel_oem7_msgs::msg::INSPVA;
+using novatel_oem7_msgs::msg::INSPVAX;
 
 
 
@@ -170,8 +170,8 @@ namespace novatel_oem7_driver
    */
   ValueRelation
   GetOem7MessageTimeRelation(
-      art_novatel_oem7_msgs::msg::Oem7Header msg_hdr_1,
-      art_novatel_oem7_msgs::msg::Oem7Header msg_hdr_2)
+      novatel_oem7_msgs::msg::Oem7Header msg_hdr_1,
+      novatel_oem7_msgs::msg::Oem7Header msg_hdr_2)
   {
     if(msg_hdr_1.gps_week_number > msg_hdr_2.gps_week_number)
       return REL_GT;
@@ -319,28 +319,28 @@ namespace novatel_oem7_driver
 
     void publishBESTUTM(Oem7RawMessageIf::ConstPtr msg)
     {
-        std::shared_ptr<art_novatel_oem7_msgs::msg::BESTUTM> bestutm;
+        std::shared_ptr<novatel_oem7_msgs::msg::BESTUTM> bestutm;
         MakeROSMessage(msg, bestutm);
         BESTUTM_pub_->publish(bestutm);
     }
 
     void publishBESTGNSSPOS(Oem7RawMessageIf::ConstPtr msg)
     {
-        std::shared_ptr<art_novatel_oem7_msgs::msg::BESTPOS> bestgnsspos;
+        std::shared_ptr<novatel_oem7_msgs::msg::BESTPOS> bestgnsspos;
         MakeROSMessage(msg, bestgnsspos);
         BESTGNSSPOS_pub_->publish(bestgnsspos);
     }
 
     void publishBESTGNSSVEL(Oem7RawMessageIf::ConstPtr msg)
     {
-        std::shared_ptr<art_novatel_oem7_msgs::msg::BESTVEL> bestgnssvel;
+        std::shared_ptr<novatel_oem7_msgs::msg::BESTVEL> bestgnssvel;
         MakeROSMessage(msg, bestgnssvel);
         BESTGNSSVEL_pub_->publish(bestgnssvel);
     }
 
     void publishPPPPOS(Oem7RawMessageIf::ConstPtr msg)
     {
-        std::shared_ptr<art_novatel_oem7_msgs::msg::PPPPOS> ppppos;
+        std::shared_ptr<novatel_oem7_msgs::msg::PPPPOS> ppppos;
         MakeROSMessage(msg, ppppos);
         PPPPOS_pub_->publish(ppppos);
     }
@@ -406,7 +406,7 @@ namespace novatel_oem7_driver
                             bestvel_->nov_header.gps_week_milliseconds);
         }
 
-        if(bestvel_->vel_type.type == art_novatel_oem7_msgs::msg::PositionOrVelocityType::DOPPLER_VELOCITY)
+        if(bestvel_->vel_type.type == novatel_oem7_msgs::msg::PositionOrVelocityType::DOPPLER_VELOCITY)
         {
           gpsfix_->status.motion_source |= GPSStatus::SOURCE_DOPPLER;
         }
@@ -624,42 +624,42 @@ namespace novatel_oem7_driver
 
       switch(bestpos->pos_type.type)
       {
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::PSRDIFF:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::INS_PSRDIFF:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::L1_FLOAT:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::NARROW_FLOAT:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::L1_INT:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::WIDE_INT:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::NARROW_INT:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::RTK_DIRECT_INS:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::INS_RTKFLOAT:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::INS_RTKFIXED:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::PSRDIFF:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::INS_PSRDIFF:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::L1_FLOAT:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::NARROW_FLOAT:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::L1_INT:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::WIDE_INT:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::NARROW_INT:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::RTK_DIRECT_INS:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::INS_RTKFLOAT:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::INS_RTKFIXED:
           return GPSStatus::STATUS_DGPS_FIX;
 
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::FIXEDPOS:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::FIXEDHEIGHT:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::DOPPLER_VELOCITY:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::SINGLE:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::INS_PSRSP:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::PROPAGATED:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::OPERATIONAL:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::WARNING:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::OUT_OF_BOUNDS:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::FIXEDPOS:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::FIXEDHEIGHT:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::DOPPLER_VELOCITY:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::SINGLE:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::INS_PSRSP:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::PROPAGATED:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::OPERATIONAL:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::WARNING:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::OUT_OF_BOUNDS:
           return GPSStatus::STATUS_FIX;
 
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::WAAS:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::INS_SBAS:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::PPP_CONVERGING:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::PPP:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::INS_PPP_CONVERGING:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::INS_PPP:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::PPP_BASIC_CONVERGING:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::PPP_BASIC:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::INS_PPP_BASIC_CONVERGING:
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::INS_PPP_BASIC:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::WAAS:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::INS_SBAS:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::PPP_CONVERGING:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::PPP:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::INS_PPP_CONVERGING:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::INS_PPP:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::PPP_BASIC_CONVERGING:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::PPP_BASIC:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::INS_PPP_BASIC_CONVERGING:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::INS_PPP_BASIC:
           return GPSStatus::STATUS_SBAS_FIX;
 
-        case art_novatel_oem7_msgs::msg::PositionOrVelocityType::NONE:
+        case novatel_oem7_msgs::msg::PositionOrVelocityType::NONE:
           return GPSStatus::STATUS_NO_FIX;
 
         default:
@@ -847,7 +847,7 @@ namespace novatel_oem7_driver
 
       if(msg->getMessageId() == INSPVAX_OEM7_MSGID)
       {
-        MakeROSMessage<art_novatel_oem7_msgs::msg::INSPVAX>(msg, inspvax_);
+        MakeROSMessage<novatel_oem7_msgs::msg::INSPVAX>(msg, inspvax_);
       }
 
       if(msg->getMessageId() == PSRDOP2_OEM7_MSGID)
