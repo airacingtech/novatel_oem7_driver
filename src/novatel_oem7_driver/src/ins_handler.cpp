@@ -35,12 +35,12 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include "sensor_msgs/msg/imu.hpp"
 
-#include "art_novatel_oem7_msgs/msg/corrimu.hpp"
-#include "art_novatel_oem7_msgs/msg/imuratecorrimu.hpp"
-#include "art_novatel_oem7_msgs/msg/insstdev.hpp"
-#include "art_novatel_oem7_msgs/msg/insconfig.hpp"
-#include "art_novatel_oem7_msgs/msg/inspva.hpp"
-#include "art_novatel_oem7_msgs/msg/inspvax.hpp"
+#include "novatel_oem7_msgs/msg/corrimu.hpp"
+#include "novatel_oem7_msgs/msg/imuratecorrimu.hpp"
+#include "novatel_oem7_msgs/msg/insstdev.hpp"
+#include "novatel_oem7_msgs/msg/insconfig.hpp"
+#include "novatel_oem7_msgs/msg/inspva.hpp"
+#include "novatel_oem7_msgs/msg/inspvax.hpp"
 
 #include <oem7_ros_publisher.hpp>
 #include <driver_parameter.hpp>
@@ -69,15 +69,15 @@ namespace novatel_oem7_driver
 
     std::unique_ptr<Oem7RosPublisher<sensor_msgs::msg::Imu>>                   imu_pub_;
     std::unique_ptr<Oem7RosPublisher<sensor_msgs::msg::Imu>>                   raw_imu_pub_;
-    std::unique_ptr<Oem7RosPublisher<art_novatel_oem7_msgs::msg::CORRIMU>>         corrimu_pub_;
-    std::unique_ptr<Oem7RosPublisher<art_novatel_oem7_msgs::msg::INSSTDEV>>        insstdev_pub_;
-    std::unique_ptr<Oem7RosPublisher<art_novatel_oem7_msgs::msg::INSPVAX>>         inspvax_pub_;
-    std::unique_ptr<Oem7RosPublisher<art_novatel_oem7_msgs::msg::INSCONFIG>>       insconfig_pub_;
+    std::unique_ptr<Oem7RosPublisher<novatel_oem7_msgs::msg::CORRIMU>>         corrimu_pub_;
+    std::unique_ptr<Oem7RosPublisher<novatel_oem7_msgs::msg::INSSTDEV>>        insstdev_pub_;
+    std::unique_ptr<Oem7RosPublisher<novatel_oem7_msgs::msg::INSPVAX>>         inspvax_pub_;
+    std::unique_ptr<Oem7RosPublisher<novatel_oem7_msgs::msg::INSCONFIG>>       insconfig_pub_;
 
 
-    std::shared_ptr<art_novatel_oem7_msgs::msg::INSPVA>   inspva_;
-    std::shared_ptr<art_novatel_oem7_msgs::msg::CORRIMU>  corrimu_;
-    std::shared_ptr<art_novatel_oem7_msgs::msg::INSSTDEV> insstdev_;
+    std::shared_ptr<novatel_oem7_msgs::msg::INSPVA>   inspva_;
+    std::shared_ptr<novatel_oem7_msgs::msg::CORRIMU>  corrimu_;
+    std::shared_ptr<novatel_oem7_msgs::msg::INSSTDEV> insstdev_;
 
     oem7_imu_rate_t imu_rate_;                    ///< IMU output rate
     double          imu_raw_gyro_scale_factor_;   ///< IMU-specific raw gyroscope scaling
@@ -106,7 +106,7 @@ namespace novatel_oem7_driver
 
     void processInsConfigMsg(Oem7RawMessageIf::ConstPtr msg)
     {
-      std::shared_ptr<art_novatel_oem7_msgs::msg::INSCONFIG> insconfig;
+      std::shared_ptr<novatel_oem7_msgs::msg::INSCONFIG> insconfig;
       MakeROSMessage(msg, insconfig);
       insconfig_pub_->publish(insconfig);
 
@@ -152,7 +152,7 @@ namespace novatel_oem7_driver
 
     void publishInsPVAXMsg(Oem7RawMessageIf::ConstPtr msg)
     {
-      std::shared_ptr<art_novatel_oem7_msgs::msg::INSPVAX> inspvax;
+      std::shared_ptr<novatel_oem7_msgs::msg::INSPVAX> inspvax;
       MakeROSMessage(msg, inspvax);
 
       inspvax_pub_->publish(inspvax);
@@ -282,10 +282,10 @@ namespace novatel_oem7_driver
 
       imu_pub_       = std::make_unique<Oem7RosPublisher<sensor_msgs::msg::Imu>>(            "IMU",       node);
       raw_imu_pub_   = std::make_unique<Oem7RosPublisher<sensor_msgs::msg::Imu>>(            "RAWIMU",    node);
-      corrimu_pub_   = std::make_unique<Oem7RosPublisher<art_novatel_oem7_msgs::msg::CORRIMU>>(  "CORRIMU",   node);
-      insstdev_pub_  = std::make_unique<Oem7RosPublisher<art_novatel_oem7_msgs::msg::INSSTDEV>>( "INSSTDEV",  node);
-      inspvax_pub_   = std::make_unique<Oem7RosPublisher<art_novatel_oem7_msgs::msg::INSPVAX>>(  "INSPVAX",   node);
-      insconfig_pub_ = std::make_unique<Oem7RosPublisher<art_novatel_oem7_msgs::msg::INSCONFIG>>("INSCONFIG", node);
+      corrimu_pub_   = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::CORRIMU>>(  "CORRIMU",   node);
+      insstdev_pub_  = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::INSSTDEV>>( "INSSTDEV",  node);
+      inspvax_pub_   = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::INSPVAX>>(  "INSPVAX",   node);
+      insconfig_pub_ = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::INSCONFIG>>("INSCONFIG", node);
 
       DriverParameter<int> imu_rate_p("oem7_imu_rate", 0, *node_);
       imu_rate_ = imu_rate_p.value();

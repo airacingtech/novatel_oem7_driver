@@ -28,9 +28,9 @@
 
 
 #include <novatel_oem7_driver/oem7_ros_messages.hpp>
-#include <art_novatel_oem7_msgs/msg/heading2.hpp>
-#include "art_novatel_oem7_msgs/msg/masterpos.hpp"
-#include "art_novatel_oem7_msgs/msg/roverpos.hpp"
+#include <novatel_oem7_msgs/msg/heading2.hpp>
+#include <novatel_oem7_msgs/msg/masterpos.hpp>
+#include <novatel_oem7_msgs/msg/roverpos.hpp>
 
 #include <oem7_ros_publisher.hpp>
 
@@ -43,15 +43,15 @@ namespace novatel_oem7_driver
    */
   class ALIGNHandler: public Oem7MessageHandlerIf
   {
-    std::unique_ptr<Oem7RosPublisher<art_novatel_oem7_msgs::msg::HEADING2>> HEADING2_pub_; ///< Publisher for NMEA sentences;
-    std::unique_ptr<Oem7RosPublisher<art_novatel_oem7_msgs::msg::MASTERPOS>> MASTERPOS_pub_;
-    std::unique_ptr<Oem7RosPublisher<art_novatel_oem7_msgs::msg::ROVERPOS>> ROVERPOS_pub_;
+    std::unique_ptr<Oem7RosPublisher<novatel_oem7_msgs::msg::HEADING2>> HEADING2_pub_; ///< Publisher for NMEA sentences;
+    std::unique_ptr<Oem7RosPublisher<novatel_oem7_msgs::msg::MASTERPOS>> MASTERPOS_pub_;
+    std::unique_ptr<Oem7RosPublisher<novatel_oem7_msgs::msg::ROVERPOS>> ROVERPOS_pub_;
 
 
     void publishHEADING2(
         Oem7RawMessageIf::ConstPtr msg)
     {
-      std::shared_ptr<art_novatel_oem7_msgs::msg::HEADING2> heading2;
+      std::shared_ptr<novatel_oem7_msgs::msg::HEADING2> heading2;
       MakeROSMessage(msg, heading2);
       HEADING2_pub_->publish(heading2);
     }
@@ -59,7 +59,7 @@ namespace novatel_oem7_driver
     void publishMASTERPOS(
         Oem7RawMessageIf::ConstPtr msg)
     {
-      std::shared_ptr<art_novatel_oem7_msgs::msg::MASTERPOS> masterpos;
+      std::shared_ptr<novatel_oem7_msgs::msg::MASTERPOS> masterpos;
       MakeROSMessage(msg, masterpos);
       MASTERPOS_pub_->publish(masterpos);
     }
@@ -67,7 +67,7 @@ namespace novatel_oem7_driver
     void publishROVERPOS(
         Oem7RawMessageIf::ConstPtr msg)
     {
-      std::shared_ptr<art_novatel_oem7_msgs::msg::ROVERPOS> roverpos;
+      std::shared_ptr<novatel_oem7_msgs::msg::ROVERPOS> roverpos;
       MakeROSMessage(msg, roverpos);
       ROVERPOS_pub_->publish(roverpos);
     }
@@ -83,9 +83,9 @@ namespace novatel_oem7_driver
 
     void initialize(rclcpp::Node& node)
     {
-      HEADING2_pub_ = std::make_unique<Oem7RosPublisher<art_novatel_oem7_msgs::msg::HEADING2>>("HEADING2", node);
-      MASTERPOS_pub_ = std::make_unique<Oem7RosPublisher<art_novatel_oem7_msgs::msg::MASTERPOS>>("MASTERPOS", node);
-      ROVERPOS_pub_ = std::make_unique<Oem7RosPublisher<art_novatel_oem7_msgs::msg::ROVERPOS>>("ROVERPOS", node);
+      HEADING2_pub_ = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::HEADING2>>("HEADING2", node);
+      MASTERPOS_pub_ = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::MASTERPOS>>("MASTERPOS", node);
+      ROVERPOS_pub_ = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::ROVERPOS>>("ROVERPOS", node);
     }
 
     const MessageIdRecords& getMessageIds()

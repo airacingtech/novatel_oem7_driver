@@ -16,7 +16,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(nmea_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
-find_package(art_novatel_oem7_msgs REQUIRED)
+find_package(novatel_oem7_msgs REQUIRED)
 find_package(backward_ros REQUIRED)
 find_package(Boost  			REQUIRED)
 
@@ -121,7 +121,7 @@ ament_target_dependencies(${PROJECT_NAME}
 	nmea_msgs 	
 	nav_msgs
 	tf2_geometry_msgs 
-	art_novatel_oem7_msgs
+	novatel_oem7_msgs
 	backward_ros
 )
 
@@ -130,7 +130,7 @@ ament_target_dependencies(${PROJECT_NAME}_exe
     rclcpp
     rclcpp_components
 	pluginlib
-	art_novatel_oem7_msgs
+	novatel_oem7_msgs
 	backward_ros 
 )
 

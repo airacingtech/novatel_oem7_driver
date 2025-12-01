@@ -25,8 +25,8 @@
 #ifndef __OEM7_MESSAGE_UTIL_HPP__
 #define __OEM7_MESSAGE_UTIL_HPP__
 
-#include "art_novatel_oem7_msgs/msg/oem7_header.hpp"
-#include "art_novatel_oem7_msgs/msg/oem7_raw_msg.hpp"
+#include "novatel_oem7_msgs/msg/oem7_header.hpp"
+#include "novatel_oem7_msgs/msg/oem7_raw_msg.hpp"
 
 #include "novatel_oem7_driver/oem7_message_ids.h"
 
@@ -71,7 +71,7 @@ namespace novatel_oem7_driver
    */
   void getOem7Header(
       const Oem7RawMessageIf::ConstPtr& raw_msg, ///< [in] Raw binary message
-      art_novatel_oem7_msgs::msg::Oem7Header& hdr   ///< [out] Oem7 Message Header
+      novatel_oem7_msgs::msg::Oem7Header& hdr   ///< [out] Oem7 Message Header
       );
 
   /**
@@ -80,7 +80,7 @@ namespace novatel_oem7_driver
    */
   void getOem7ShortHeader(
       const Oem7RawMessageIf::ConstPtr& raw_msg, ///< [in] Raw binary message
-      art_novatel_oem7_msgs::msg::Oem7Header& hdr   ///< [out] Oem7 Message Header
+      novatel_oem7_msgs::msg::Oem7Header& hdr   ///< [out] Oem7 Message Header
       );
 
   bool isNMEAMessage(const Oem7RawMessageIf::ConstPtr& raw_msg);
