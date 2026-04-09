@@ -547,3 +547,8 @@ namespace novatel_oem7_driver
 
 #include <rclcpp_components/register_node_macro.hpp>
 RCLCPP_COMPONENTS_REGISTER_NODE(novatel_oem7_driver::Oem7MessageNode)
+
+std::shared_ptr<rclcpp::Node> novatel_oem7_driver_create_node(const rclcpp::NodeOptions& options)
+{
+  return std::make_shared<novatel_oem7_driver::Oem7MessageNode>(options);
+}

@@ -123,7 +123,15 @@ ament_target_dependencies(${PROJECT_NAME}
 
 rclcpp_components_register_node(${PROJECT_NAME}
   PLUGIN "novatel_oem7_driver::Oem7MessageNode"
-  EXECUTABLE ${PROJECT_NAME}_exe
+)
+
+# Standalone executable that constructs the node directly
+# (bypasses class_loader to avoid self-loading pluginlib issue)
+add_executable(${PROJECT_NAME}_exe src/main.cpp)
+target_link_libraries(${PROJECT_NAME}_exe ${PROJECT_NAME})
+ament_target_dependencies(${PROJECT_NAME}_exe rclcpp)
+install(TARGETS ${PROJECT_NAME}_exe
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
