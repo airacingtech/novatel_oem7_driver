@@ -547,20 +547,3 @@ namespace novatel_oem7_driver
 
 #include <rclcpp_components/register_node_macro.hpp>
 RCLCPP_COMPONENTS_REGISTER_NODE(novatel_oem7_driver::Oem7MessageNode)
-
-
-int main(int argc, char* argv[])
-{
-  rclcpp::init(argc, argv);
-
-  rclcpp::NodeOptions options;
-  auto oem7 = std::make_shared<novatel_oem7_driver::Oem7MessageNode>(options);
-
-  static const size_t THREAD_NUM = 3; // Default + Receive and blocking command service.
-  rclcpp::ExecutorOptions defaultOptions;
-  rclcpp::executors::MultiThreadedExecutor executor(defaultOptions, THREAD_NUM);
-  executor.add_node(oem7);
-  executor.spin();
-  rclcpp::shutdown();
-  return 0;
-}

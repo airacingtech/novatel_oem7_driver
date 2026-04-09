@@ -87,15 +87,9 @@ add_library(${PROJECT_NAME} SHARED
    src/odometry_handler.cpp
    src/range_handler.cpp
    src/oem7_imu.cpp
-)
-
-## All components are plugins
-add_executable(${PROJECT_NAME}_exe
    src/oem7_message_node.cpp
-   src/oem7_message_util.cpp
-   src/oem7_ros_messages.cpp
    src/message_handler.cpp
-) 
+)
 
 
 
@@ -113,31 +107,23 @@ target_link_libraries(${PROJECT_NAME}
 
 add_dependencies(${PROJECT_NAME} ${OEM7_DECODER})
 
-ament_target_dependencies(${PROJECT_NAME} 
+ament_target_dependencies(${PROJECT_NAME}
+	rclcpp
+	rclcpp_components
 	pluginlib
-	std_msgs 
+	std_msgs
 	gps_msgs
-	sensor_msgs 
-	nmea_msgs 	
+	sensor_msgs
+	nmea_msgs
 	nav_msgs
-	tf2_geometry_msgs 
+	tf2_geometry_msgs
 	novatel_oem7_msgs
 	backward_ros
 )
 
-
-ament_target_dependencies(${PROJECT_NAME}_exe 
-    rclcpp
-    rclcpp_components
-	pluginlib
-	novatel_oem7_msgs
-	backward_ros 
-)
-
-
-install(TARGETS
-  ${PROJECT_NAME}_exe
-  DESTINATION lib/${PROJECT_NAME}
+rclcpp_components_register_node(${PROJECT_NAME}
+  PLUGIN "novatel_oem7_driver::Oem7MessageNode"
+  EXECUTABLE ${PROJECT_NAME}_exe
 )
 
 if(BUILD_TESTING)
