@@ -264,7 +264,7 @@ namespace novatel_oem7_driver
       std::shared_ptr<sensor_msgs::msg::Imu> imu = std::make_shared<sensor_msgs::msg::Imu>();
 
       // All measurements are in sensor frame, uncorrected for gravity. There is no up, forward, left;
-      // x, y, z are nominal references to enclsoure housing.
+      // x, y, z are nominal references to enclosure housing.
       imu->angular_velocity.x =  computeAngularVelocityFromRaw(raw->x_gyro);
       imu->angular_velocity.y = -computeAngularVelocityFromRaw(raw->y_gyro); // Refer to RAWIMUSX documentation
       imu->angular_velocity.z =  computeAngularVelocityFromRaw(raw->z_gyro);
@@ -287,6 +287,7 @@ namespace novatel_oem7_driver
         std::shared_ptr<sensor_msgs::msg::Temperature> temp = std::make_shared<sensor_msgs::msg::Temperature>();
         temp->temperature = imu_temperature_scale_factor_ * static_cast<double>(temp_raw) + 34.9876012;
         temp->variance = DATA_NOT_AVAILABLE;
+        std::cout << "Raw IMU temperature: " << temp_raw << " scaled: " << temp->temperature << std::endl;
         temp_pub_->publish(temp);
       }
     }
