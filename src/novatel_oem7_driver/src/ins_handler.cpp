@@ -34,6 +34,7 @@
 
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include "sensor_msgs/msg/imu.hpp"
+#include "sensor_msgs/msg/temperature.hpp"
 
 #include "novatel_oem7_msgs/msg/corrimu.hpp"
 #include "novatel_oem7_msgs/msg/imuratecorrimu.hpp"
@@ -45,6 +46,7 @@
 #include <oem7_ros_publisher.hpp>
 #include <driver_parameter.hpp>
 
+#include <cstring>
 #include <math.h>
 #include <map>
 
@@ -73,6 +75,7 @@ namespace novatel_oem7_driver
     std::unique_ptr<Oem7RosPublisher<novatel_oem7_msgs::msg::INSSTDEV>>        insstdev_pub_;
     std::unique_ptr<Oem7RosPublisher<novatel_oem7_msgs::msg::INSPVAX>>         inspvax_pub_;
     std::unique_ptr<Oem7RosPublisher<novatel_oem7_msgs::msg::INSCONFIG>>       insconfig_pub_;
+    std::unique_ptr<Oem7RosPublisher<sensor_msgs::msg::Temperature>>           temp_pub_;
 
 
     std::shared_ptr<novatel_oem7_msgs::msg::INSPVA>   inspva_;
@@ -82,7 +85,7 @@ namespace novatel_oem7_driver
     oem7_imu_rate_t imu_rate_;                    ///< IMU output rate
     double          imu_raw_gyro_scale_factor_;   ///< IMU-specific raw gyroscope scaling
     double          imu_raw_accel_scale_factor_;  ///< IMU-specific raw acceleration scaling.
-
+    double          imu_temperature_scale_factor_;  ///< IMU-specific raw temperature scaling.
     std::string frame_id_;
 
     typedef std::map<std::string, std::string> imu_config_map_t;
@@ -135,19 +138,31 @@ namespace novatel_oem7_driver
               imu_rate_,
               imu_raw_gyro_scale_factor_,
               imu_raw_accel_scale_factor_))
-
           {
             RCLCPP_ERROR_STREAM(node_->get_logger(), 
               "IMU type= '" << insconfig->imu_type << "'; Scale factors unavilable. Raw IMU output disabled");
             return;
           }
       }
+
+      if(imu_temperature_scale_factor_ == 0.0) // No override, this is normal.
+      {
+        if(!getImuTemperatureScaleFactor(
+          imu_type,
+          imu_temperature_scale_factor_))
+        {
+          RCLCPP_ERROR_STREAM(node_->get_logger(), 
+            "IMU type= '" << insconfig->imu_type << "'; Temperature scale factor unavilable. IMU temperature output unavailable.");
+          return;
+        }
+      }
               
       RCLCPP_INFO_STREAM(node_->get_logger(),
                          "IMU: "          << imu_type  << " '"  << imu_desc << "' "
                       << "rate= "         << imu_rate_                      << "' "
                       << "gyro scale= "   << imu_raw_gyro_scale_factor_     << "' "
-                      << "accel scale= "  << imu_raw_accel_scale_factor_);
+                      << "accel scale= "  << imu_raw_accel_scale_factor_   << "' "
+                      << "temperature scale= " << imu_temperature_scale_factor_);
     }
 
     void publishInsPVAXMsg(Oem7RawMessageIf::ConstPtr msg)
@@ -261,6 +276,19 @@ namespace novatel_oem7_driver
       imu->orientation_covariance[0] = DATA_NOT_AVAILABLE;
 
       raw_imu_pub_->publish(imu);
+
+      // Temperature: upper 16 bits of the 32-bit IMU Status word (OEM7 RAWIMUSX docs)
+      if(temp_pub_->isEnabled() && imu_temperature_scale_factor_ != 0.0)
+      {
+        uint32_t status;
+        std::memcpy(&status, raw->imu_status, sizeof(status));
+        int16_t temp_raw = static_cast<int16_t>((status >> 16) & 0xFFFF);
+
+        std::shared_ptr<sensor_msgs::msg::Temperature> temp = std::make_shared<sensor_msgs::msg::Temperature>();
+        temp->temperature = imu_temperature_scale_factor_ * static_cast<double>(temp_raw) + 34.9876012;
+        temp->variance = DATA_NOT_AVAILABLE;
+        temp_pub_->publish(temp);
+      }
     }
 
 
@@ -268,7 +296,8 @@ namespace novatel_oem7_driver
     INSHandler():
       imu_rate_(0),
       imu_raw_gyro_scale_factor_ (0.0),
-      imu_raw_accel_scale_factor_(0.0)
+      imu_raw_accel_scale_factor_(0.0),
+      imu_temperature_scale_factor_(0.0)
     {
     }
 
@@ -286,7 +315,7 @@ namespace novatel_oem7_driver
       insstdev_pub_  = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::INSSTDEV>>( "INSSTDEV",  node);
       inspvax_pub_   = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::INSPVAX>>(  "INSPVAX",   node);
       insconfig_pub_ = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::INSCONFIG>>("INSCONFIG", node);
-
+      temp_pub_      = std::make_unique<Oem7RosPublisher<sensor_msgs::msg::Temperature>>(    "IMU_TEMPERATURE", node);
       DriverParameter<int> imu_rate_p("oem7_imu_rate", 0, *node_);
       imu_rate_ = imu_rate_p.value();
       if(imu_rate_ > 0)

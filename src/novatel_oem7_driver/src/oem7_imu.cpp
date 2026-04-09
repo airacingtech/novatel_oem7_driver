@@ -56,7 +56,6 @@ inline double feetToMeters(double feet)
   return feet / 3.2808;
 }
 
-
 bool
 getImuRawScaleFactors(
     oem7_imu_type_t imu_type,
@@ -155,5 +154,27 @@ getImuRawScaleFactors(
 
 }
 
+bool
+getImuTemperatureScaleFactor(
+    oem7_imu_type_t imu_type,
+    double& temperature_scale)
+{
+  // Refer to OEM7 documentation for temperature scaling.
+
+  switch(imu_type)
+  {
+    case IMU_TYPE_EPSON_G320:
+    case IMU_TYPE_EPSON_G320_200HZ:
+      temperature_scale = -0.0037918;
+      break;
+    case IMU_TYPE_EPSON_G370:
+      temperature_scale = -0.0037918;
+      break;
+    default:
+      return false;
+  }
+
+  return true;
+}
 
 }
