@@ -18,7 +18,11 @@ int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
   auto node = novatel_oem7_driver_create_node(rclcpp::NodeOptions{});
-  rclcpp::spin(node);
+
+  static const size_t THREAD_NUM = 3;
+  rclcpp::executors::MultiThreadedExecutor executor(rclcpp::ExecutorOptions{}, THREAD_NUM);
+  executor.add_node(node);
+  executor.spin();
   rclcpp::shutdown();
   return 0;
 }
