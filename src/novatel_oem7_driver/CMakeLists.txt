@@ -123,6 +123,7 @@ ament_target_dependencies(${PROJECT_NAME}
 
 rclcpp_components_register_node(${PROJECT_NAME}
   PLUGIN "novatel_oem7_driver::Oem7MessageNode"
+  EXECUTABLE ${PROJECT_NAME}_component_exe
 )
 
 # Standalone executable that constructs the node directly
