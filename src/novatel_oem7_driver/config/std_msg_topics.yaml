@@ -3,6 +3,7 @@ GPSFix:          {topic: gps,            frame_id: gps}
 NavSatFix:       {topic: fix,            frame_id: gps} 
 IMU:             {topic: imu/data,       frame_id: imu_link}
 RAWIMU:          {topic: imu/data_raw,   frame_id: imu_link}
+IMU_TEMPERATURE: {topic: imu/temperature,frame_id: imu_link}
 Odometry:        {topic: odom,           frame_id: odom} 
 OdometryOrigin:  {topic: odom_origin,    frame_id: odom} 
 

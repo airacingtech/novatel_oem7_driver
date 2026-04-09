@@ -73,4 +73,14 @@ getImuRawScaleFactors(
     double& acc_scale         ///< Accelerometer scale factor
     );
 
+/// @brief 
+/// Obtain scaling factor for raw IMU temperature output (as reported by RAWIMUS etc).
+/// Refer to OEM7 documentation for temperature scaling.
+/// @return false if the IMU is not supported. This means that the code was not updated
+///               to reflect new OEM7 product release.
+bool
+getImuTemperatureScaleFactor(
+    oem7_imu_type_t imu_type, ///< IMU type.
+    double& temp_scale        ///< Temperature scale factor
+    );
 }
