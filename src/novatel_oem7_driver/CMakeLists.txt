@@ -133,7 +133,7 @@ ament_target_dependencies(${PROJECT_NAME}_node
 )
 rclcpp_components_register_node(${PROJECT_NAME}_node
   PLUGIN "novatel_oem7_driver::Oem7MessageNode"
-  EXECUTABLE ${PROJECT_NAME}_component_exe
+  EXECUTABLE ${PROJECT_NAME}_component_exe_unused
 )
 
 ## Standalone executable with MultiThreadedExecutor
@@ -141,11 +141,15 @@ add_executable(${PROJECT_NAME}_exe src/main.cpp)
 target_link_libraries(${PROJECT_NAME}_exe ${PROJECT_NAME}_node)
 ament_target_dependencies(${PROJECT_NAME}_exe rclcpp)
 
+## Custom component container with 3 threads (vs component_container_mt's nproc default)
+add_executable(${PROJECT_NAME}_container src/component_container.cpp)
+ament_target_dependencies(${PROJECT_NAME}_container rclcpp rclcpp_components)
+
 install(TARGETS ${PROJECT_NAME}_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
 )
-install(TARGETS ${PROJECT_NAME}_exe
+install(TARGETS ${PROJECT_NAME}_exe ${PROJECT_NAME}_container
   DESTINATION lib/${PROJECT_NAME}
 )
 

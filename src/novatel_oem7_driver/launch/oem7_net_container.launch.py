@@ -37,8 +37,8 @@ def generate_launch_description():
     container = ComposableNodeContainer(
         name='novatel_container',
         namespace='',
-        package='rclcpp_components',
-        executable='component_container_mt',
+        package='novatel_oem7_driver',
+        executable='novatel_oem7_driver_container',
         composable_node_descriptions=[
             ComposableNode(
                 package=PKG,
