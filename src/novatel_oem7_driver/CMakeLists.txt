@@ -67,7 +67,7 @@ include_directories(include
     ${PCAP_INCLUDE_DIRS}
 )
 
-## Plugin library: receivers, handlers, decoders (loaded by pluginlib at runtime)
+## All components are plugins
 add_library(${PROJECT_NAME} SHARED
    src/oem7_receiver_net.cpp
    src/oem7_receiver_port.cpp
@@ -89,6 +89,16 @@ add_library(${PROJECT_NAME} SHARED
    src/oem7_imu.cpp
 )
 
+## All components are plugins
+add_executable(${PROJECT_NAME}_exe
+   src/oem7_message_node.cpp
+   src/oem7_message_util.cpp
+   src/oem7_ros_messages.cpp
+   src/message_handler.cpp
+) 
+
+
+
 message("Linking to EDIE at: '${CMAKE_BINARY_DIR}'")
 
 target_link_libraries(${PROJECT_NAME}
@@ -98,58 +108,35 @@ target_link_libraries(${PROJECT_NAME}
    ${CMAKE_BINARY_DIR}/usr/lib/libCommon.a
    ${CMAKE_BINARY_DIR}/usr/lib/libStreamInterface.a
    ${CMAKE_BINARY_DIR}/usr/lib/libNovatel.a
-   ${CMAKE_BINARY_DIR}/usr/lib/libCommon.a
+   ${CMAKE_BINARY_DIR}/usr/lib/libCommon.a   
 )
 
 add_dependencies(${PROJECT_NAME} ${OEM7_DECODER})
 
-ament_target_dependencies(${PROJECT_NAME}
+ament_target_dependencies(${PROJECT_NAME} 
 	pluginlib
-	std_msgs
+	std_msgs 
 	gps_msgs
-	sensor_msgs
-	nmea_msgs
+	sensor_msgs 
+	nmea_msgs 	
 	nav_msgs
-	tf2_geometry_msgs
+	tf2_geometry_msgs 
 	novatel_oem7_msgs
 	backward_ros
 )
 
-## Node component library: separate from plugins so pluginlib can dlopen the
-## plugin library without the self-loading conflict.
-add_library(${PROJECT_NAME}_node SHARED
-   src/oem7_message_node.cpp
-   src/oem7_message_util.cpp
-   src/oem7_ros_messages.cpp
-   src/message_handler.cpp
-)
-target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME})
-ament_target_dependencies(${PROJECT_NAME}_node
+
+ament_target_dependencies(${PROJECT_NAME}_exe 
     rclcpp
     rclcpp_components
-    pluginlib
-    novatel_oem7_msgs
-    backward_ros
-)
-rclcpp_components_register_node(${PROJECT_NAME}_node
-  PLUGIN "novatel_oem7_driver::Oem7MessageNode"
-  EXECUTABLE ${PROJECT_NAME}_component_exe_unused
+	pluginlib
+	novatel_oem7_msgs
+	backward_ros 
 )
 
-## Standalone executable with MultiThreadedExecutor
-add_executable(${PROJECT_NAME}_exe src/main.cpp)
-target_link_libraries(${PROJECT_NAME}_exe ${PROJECT_NAME}_node)
-ament_target_dependencies(${PROJECT_NAME}_exe rclcpp)
 
-## Custom component container with 3 threads (vs component_container_mt's nproc default)
-add_executable(${PROJECT_NAME}_container src/component_container.cpp)
-ament_target_dependencies(${PROJECT_NAME}_container rclcpp rclcpp_components)
-
-install(TARGETS ${PROJECT_NAME}_node
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-)
-install(TARGETS ${PROJECT_NAME}_exe ${PROJECT_NAME}_container
+install(TARGETS
+  ${PROJECT_NAME}_exe
   DESTINATION lib/${PROJECT_NAME}
 )
 
