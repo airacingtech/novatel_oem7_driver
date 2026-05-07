@@ -522,7 +522,7 @@ namespace novatel_oem7_driver
 
       const struct iphdr* ip_header = reinterpret_cast<const struct iphdr*>(packet + offset);
       uint16_t ip_total_length = ntohs(ip_header->tot_len);
-      
+
       if(ip_header->protocol != IPPROTO_TCP && ip_header->protocol != IPPROTO_UDP)
       {
         return nullptr;

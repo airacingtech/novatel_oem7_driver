@@ -48,22 +48,27 @@ set(OEM7_DECODER novatel_oem7_decoder)
 include(ExternalProject)
 ExternalProject_Add(${OEM7_DECODER}
   GIT_REPOSITORY https://github.com/novatel/novatel_edie
-  GIT_TAG origin/dev-ros_install_prefix
+  GIT_TAG v3.3.7
   UPDATE_DISCONNECTED TRUE
   PREFIX ${CMAKE_BINARY_DIR}/${OEM7_DECODER}
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_BINARY_DIR} -DVERSION=1.0.0.2
+  CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release
+  INSTALL_COMMAND ""
 )
 
 
 set(OEM7_DECODER_DIR ${CMAKE_BINARY_DIR}/${OEM7_DECODER}/src/${OEM7_DECODER})
 
+# EDIE writes static libs into bin/<config>-<arch>-<distrib>/decoders/<lib>/.
+# Compute the same suffix here so we can link directly without using install.
+cmake_host_system_information(RESULT EDIE_DISTRIB_NAME QUERY DISTRIB_NAME)
+cmake_host_system_information(RESULT EDIE_DISTRIB_VERSION_ID QUERY DISTRIB_VERSION_ID)
+set(EDIE_BIN_DIR ${OEM7_DECODER_DIR}/bin/Release-x64-${EDIE_DISTRIB_NAME}-${EDIE_DISTRIB_VERSION_ID})
+
 include_directories(include
     src
-    ${OEM7_DECODER_DIR}	
+    ${OEM7_DECODER_DIR}
     ${OEM7_DECODER_DIR}/src
-    ${CMAKE_BINARY_DIR}/usr/include/novatel/edie           
-    ${OEM7_DECODER_DIR}/bin/Novatel/api/
-    ${OEM7_DECODER_DIR}/bin/StreamInterface/api/
+    ${OEM7_DECODER_DIR}/lib
     ${PCAP_INCLUDE_DIRS}
 )
 
@@ -95,10 +100,8 @@ target_link_libraries(${PROJECT_NAME}
    Boost::boost
    ${GeographicLib_LIBRARIES}
    ${PCAP_LIBRARIES}
-   ${CMAKE_BINARY_DIR}/usr/lib/libCommon.a
-   ${CMAKE_BINARY_DIR}/usr/lib/libStreamInterface.a
-   ${CMAKE_BINARY_DIR}/usr/lib/libNovatel.a
-   ${CMAKE_BINARY_DIR}/usr/lib/libCommon.a
+   ${EDIE_BIN_DIR}/decoders/novatel/libnovatel.a
+   ${EDIE_BIN_DIR}/decoders/common/libcommon.a
 )
 
 add_dependencies(${PROJECT_NAME} ${OEM7_DECODER})

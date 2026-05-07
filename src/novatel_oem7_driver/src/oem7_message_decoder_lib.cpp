@@ -1,197 +1,157 @@
 #include <oem7_message_decoder_lib.hpp>
 
+#include <decoders/novatel/api/framer.hpp>
+#include <decoders/novatel/api/common.hpp>
+#include <decoders/common/api/common.hpp>
+#include <logger/logger.hpp>
 
-
-#include <decoders/novatel/framer.hpp>
-
+#include <algorithm>
+#include <array>
+#include <cstdint>
 #include <memory>
-
-#include <iostream>
-
-
+#include <mutex>
+#include <vector>
 
 namespace
 {
-  // Versioning: reflects underlying EDIE version
   static const novatel_oem7::version_element_t VERSION_MAJOR  = 10;
-  static const novatel_oem7::version_element_t VERSION_MINOR  = 1;
+  static const novatel_oem7::version_element_t VERSION_MINOR  = 2;
   static const novatel_oem7::version_element_t VERSION_SPECIAL= 0;
-}
 
+  // Frame buffer must hold the largest possible OEM message.
+  // MAX_BINARY_MESSAGE_LENGTH covers binary; ASCII responses can be longer,
+  // so use the larger of the message-class macros.
+  constexpr size_t kFrameBufferSize = MAX_ASCII_MESSAGE_LENGTH;
+
+  // Scratch buffer used to pull bytes from the receiver before pushing into
+  // the framer. Sized to amortize syscall overhead without bloating memory.
+  constexpr size_t kReadBufferSize = 4096;
+}
 
 namespace novatel_oem7
 {
   /**
-   * A wrapper for BaseMessageData
-   * Hides EDIE accessors / data that need not be exposed (yet)
+   * Wraps a single framed OEM message: the raw frame bytes plus the
+   * MetaDataStruct populated by the EDIE Framer.
    */
-  class Oem7RawMessage: public Oem7RawMessageIf
+  class Oem7RawMessage : public Oem7RawMessageIf
   {
-    std::unique_ptr<BaseMessageData> bmd_; ///< binary message obtained from receiver
-
+    std::vector<uint8_t>           frame_;
+    novatel::edie::oem::MetaDataStruct  meta_;
 
   public:
-    Oem7RawMessage(BaseMessageData* raw_bmd):
-      bmd_(raw_bmd)
+    Oem7RawMessage(const uint8_t* data, size_t length, const novatel::edie::oem::MetaDataStruct& meta)
+    : frame_(data, data + length), meta_(meta)
     {
     }
 
-    /**
-     * @return type, Log, Response, etc.
-     */
-    Oem7MessageType   getMessageType() const
+    Oem7MessageType getMessageType() const override
     {
-      if(bmd_->getMessageType())
-      {
-        return OEM7MSGTYPE_RSP;
-      }
-      else
-      {
-        return OEM7MSGTYPE_LOG;
-      }
+      return meta_.bResponse ? OEM7MSGTYPE_RSP : OEM7MSGTYPE_LOG;
     }
 
-    /**
-     * @return format, Binary or ASCII
-     */
-    Oem7MessageFormat  getMessageFormat() const
+    Oem7MessageFormat getMessageFormat() const override
     {
-      switch(bmd_->getMessageFormat())
+      switch (meta_.eFormat)
       {
-        case MESSAGE_BINARY:               return OEM7MSGFMT_BINARY;
-        case MESSAGE_SHORT_HEADER_BINARY:  return OEM7MSGFMT_SHORTBINARY;
-        case MESSAGE_ASCII:                return OEM7MSGFMT_ASCII;
-        case MESSAGE_ABB_ASCII:            return OEM7MSGFMT_ABASCII;
-        default:                           return OEM7MSGFMT_UNKNOWN;
+        case novatel::edie::HEADERFORMAT::BINARY:        return OEM7MSGFMT_BINARY;
+        case novatel::edie::HEADERFORMAT::SHORT_BINARY:  return OEM7MSGFMT_SHORTBINARY;
+        case novatel::edie::HEADERFORMAT::ASCII:         return OEM7MSGFMT_ASCII;
+        case novatel::edie::HEADERFORMAT::ABB_ASCII:     return OEM7MSGFMT_ABASCII;
+        default:                                         return OEM7MSGFMT_UNKNOWN;
       }
     }
 
-    /**
-     * @return Oem7 message ID
-     */
-    int getMessageId() const
+    int getMessageId() const override
     {
-      return bmd_->getMessageID();
+      return meta_.usMessageID;
     }
 
-    /**
-     * @return message data blog
-     */
-    const uint8_t* getMessageData(size_t offset) const
+    const uint8_t* getMessageData(size_t offset) const override
     {
-      return reinterpret_cast<uint8_t*>(&bmd_->getMessageData()[offset]);
+      return frame_.data() + offset;
     }
 
-    /**
-     * @return length of message data
-     */
-    size_t getMessageDataLength() const
+    size_t getMessageDataLength() const override
     {
-      return bmd_->getMessageLength();
+      return frame_.size();
     }
-
   };
 
 
-/***
- * Adapter between Decoder user, and the 'Stream' interface required by EDIE's standard decoder.
- */
-class InputStream: public InputStreamInterface
-{
-  Oem7MessageDecoderLibUserIf* user_; ///< Decoder's user.
-
-  public:
-    InputStream(Oem7MessageDecoderLibUserIf* user):
-      user_(user)
-    {
-    }
-  
-    /***
-     * Called by EDIE to read bytes; refer to EDIE documentation
-     */
-    StreamReadStatus
-    ReadData(ReadDataStructure& read_data)
-    {
-      size_t rlen = 0;
-      bool ok = user_->read(boost::asio::buffer(read_data.cData, read_data.uiDataSize), rlen);
-  
-      StreamReadStatus st;
-      st.bEOS = !ok;
-      st.uiCurrentStreamRead = rlen;
-  
-      return st;
-    }
-
-
-    // Default empty implementation
-    virtual StreamReadStatus ReadLine(std::string&) { return StreamReadStatus(); };
-
-    virtual std::string GetFileExtension(){return NULL;};
-    virtual void RegisterCallBack(NovatelParser*){};
-    virtual void SetTimeOut(DOUBLE){};
-    virtual void EnableCallBack(BOOL){};
-    virtual void Reset(std::streamoff, std::ios_base::seekdir){};
-    virtual BOOL IsCallBackEnable(){return FALSE;};
-  };
-
-
-
-/**
- * Oem7 Decoder Library implementation, wrapping and hiding EDIE interfaces.
- */
-class Oem7MessageDecoderLib: public Oem7MessageDecoderLibIf
-{
-  Oem7MessageDecoderLibUserIf* user_;
-  
-  std::unique_ptr<InputStream>     input_stream_; ///< EDIE input stream; refer to EDIE documentation
-  std::unique_ptr<Framer> framer_;   ///< EDIE standard framer
-  
-public:
-  Oem7MessageDecoderLib(Oem7MessageDecoderLibUserIf* user):
-    user_(user)
-  {
-    input_stream_ = std::make_unique<InputStream>(user);
-    framer_       = std::make_unique<Framer>(input_stream_.get());
-
-    framer_->EnableUnknownData(TRUE);
-    framer_->SetBMDOutput(FLATTEN);
-  }
-  
   /**
-   * Read a complete Oem7 message from EDIE
+   * Decoder library implementation: wraps the EDIE v3 push-based framer.
+   * The user pulls bytes via Oem7MessageDecoderLibUserIf::read; we push them
+   * into the framer and harvest framed messages with GetFrame.
    */
-  virtual bool readMessage(std::shared_ptr<Oem7RawMessageIf>& msg)
+  class Oem7MessageDecoderLib : public Oem7MessageDecoderLibIf
   {
-    BaseMessageData* raw_bmd = NULL;
-    StreamReadStatus status = framer_->ReadMessage(&raw_bmd);
-    if(raw_bmd)
+    Oem7MessageDecoderLibUserIf*           user_;
+    novatel::edie::oem::Framer             framer_;
+    std::array<uint8_t, kReadBufferSize>   read_buffer_{};
+    std::array<uint8_t, kFrameBufferSize>  frame_buffer_{};
+
+  public:
+    explicit Oem7MessageDecoderLib(Oem7MessageDecoderLibUserIf* user) : user_(user)
     {
-      msg = std::make_shared<Oem7RawMessage>(raw_bmd);
+      framer_.SetFrameJson(false);
+      framer_.SetPayloadOnly(false);
     }
-  
-    // EOS: No more data is available from EDIE, e.g. EOF reached when reading from file, socket connection broken, etc.
-    return !status.bEOS;
-    // Presumably, when no message is reported, EOS is signaled. We can't handle this reliably here, let the User deal with this.
+
+    bool readMessage(std::shared_ptr<Oem7RawMessageIf>& msg) override
+    {
+      while (true)
+      {
+        novatel::edie::oem::MetaDataStruct meta;
+        const novatel::edie::STATUS status =
+          framer_.GetFrame(frame_buffer_.data(), frame_buffer_.size(), meta);
+
+        if (status == novatel::edie::STATUS::SUCCESS)
+        {
+          msg = std::make_shared<Oem7RawMessage>(frame_buffer_.data(), meta.uiLength, meta);
+          return true;
+        }
+
+        // For BUFFER_EMPTY / INCOMPLETE / INCOMPLETE_MORE_DATA we need more
+        // bytes. UNKNOWN means the framer skipped a junk byte and is ready
+        // to keep going; we feed more anyway to make forward progress.
+        size_t bytes_read = 0;
+        const bool ok = user_->read(
+          boost::asio::buffer(read_buffer_.data(), read_buffer_.size()),
+          bytes_read);
+
+        if (!ok)
+        {
+          return false;  // end of stream
+        }
+
+        if (bytes_read > 0)
+        {
+          const size_t safe_n = std::min(bytes_read, read_buffer_.size());
+          framer_.Write(read_buffer_.data(), static_cast<uint32_t>(safe_n));
+        }
+      }
+    }
+  };
+
+
+  std::shared_ptr<Oem7MessageDecoderLibIf>
+  GetOem7MessageDecoder(Oem7MessageDecoderLibUserIf* user)
+  {
+    // EDIE's Framer constructor registers a logger via Logger::RegisterLogger,
+    // which dereferences a static root logger initialized by Logger::InitLogger.
+    // Call once before constructing any Framer.
+    static std::once_flag init_logger_once;
+    std::call_once(init_logger_once, []() { Logger::InitLogger(); });
+
+    return std::make_shared<Oem7MessageDecoderLib>(user);
   }
-  
-};
 
-/**
- * Factory function
- */
-std::shared_ptr<Oem7MessageDecoderLibIf>
-GetOem7MessageDecoder(Oem7MessageDecoderLibUserIf* user)
-{
-  std::shared_ptr<Oem7MessageDecoderLib> dec(new Oem7MessageDecoderLib(user));
-  return dec;
-}
-
-void
-GetOem7MessageDecoderLibVersion(version_element_t& major, version_element_t& minor, version_element_t& spec)
-{
-  major = VERSION_MAJOR;
-  minor = VERSION_MINOR;
-  spec  = VERSION_SPECIAL;
-}
-
+  void
+  GetOem7MessageDecoderLibVersion(version_element_t& major, version_element_t& minor, version_element_t& spec)
+  {
+    major = VERSION_MAJOR;
+    minor = VERSION_MINOR;
+    spec  = VERSION_SPECIAL;
+  }
 }
