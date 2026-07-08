@@ -191,10 +191,14 @@ if(BUILD_TESTING)
  	add_launch_test(
 		test/time.test.py
 		ARGS "test_name:=time"
- 		ARGS "test_dir:=${TEST_DIR}" 
+ 		ARGS "test_dir:=${TEST_DIR}"
  		ARGS "oem7_file_name:=${TEST_DIR}/time.gps"
  	)
-	 	
+
+	find_package(ament_cmake_gtest REQUIRED)
+	ament_add_gtest(test_clock_sync test/test_clock_sync.cpp)
+	target_include_directories(test_clock_sync PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
 endif()
 
 
