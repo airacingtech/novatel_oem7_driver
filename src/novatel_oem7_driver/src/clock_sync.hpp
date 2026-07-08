@@ -39,7 +39,6 @@ public:
     double reset_gap_sec = 1.0;       ///< backward device-time jump => device reset
     double smoothing_tau_sec = 1.0;   ///< time constant for offset smoothing
     double envelope_quantile = 0.05;  ///< low quantile of (a-d) used as the offset
-    bool monotonic = true;            ///< never emit a host stamp below the previous
   };
 
   explicit ClockSync(const Config & cfg)
@@ -50,7 +49,16 @@ public:
   double offset() const {return offset_;}
 
   /// Feed one (device seconds, host arrival seconds) pair; return the host-clock
-  /// stamp to publish. Returns `arrival_s` unchanged while disabled or warming up.
+  /// stamp to publish: device time + estimated offset. Returns `arrival_s`
+  /// unchanged while disabled or warming up.
+  ///
+  /// This is a pure per-call offset mapper with NO output-sequence state, so it
+  /// can be shared across several interleaved message streams (e.g. IMU 125 Hz,
+  /// pose 100 Hz, GNSS 20 Hz) fed from one device clock. Monotonicity is a
+  /// per-stream property and holds naturally: each stream's device time is
+  /// monotonic and the offset moves slowly, so `device + offset` is monotonic
+  /// within a stream. A shared output clamp would instead couple the streams and
+  /// smear the faster ones onto the slower one's cadence.
   double update(double device_s, double arrival_s)
   {
     if (!cfg_.enabled) {return arrival_s;}
@@ -70,11 +78,7 @@ public:
 
     fit(arrival_s);
 
-    double host = converged_ ? device_s + offset_ : arrival_s;
-    if (cfg_.monotonic && have_out_ && host < last_host_s_) {host = last_host_s_;}
-    have_out_ = true;
-    last_host_s_ = host;
-    return host;
+    return converged_ ? device_s + offset_ : arrival_s;
   }
 
 private:
@@ -88,7 +92,6 @@ private:
   {
     samples_.clear();
     converged_ = false;
-    have_out_ = false;
     offset_ = 0.0;
   }
 
@@ -124,10 +127,8 @@ private:
   std::deque<Sample> samples_;
   double offset_ = 0.0;
   double last_device_s_ = 0.0;
-  double last_host_s_ = 0.0;
   double last_fit_arrival_ = 0.0;
   bool have_last_ = false;
-  bool have_out_ = false;
   bool converged_ = false;
 };
 
