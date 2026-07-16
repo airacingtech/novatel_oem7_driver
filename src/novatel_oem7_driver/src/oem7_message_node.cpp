@@ -43,6 +43,9 @@
 #include <oem7_ros_publisher.hpp>
 
 #include <message_handler.hpp>
+
+#include "clock_sync.hpp"
+#include <oem7_clock_sync_if.hpp>
 #include <driver_parameter.hpp>
 
 #include "novatel_oem7_msgs/msg/oem7_header.hpp"
@@ -69,9 +72,17 @@ namespace novatel_oem7_driver
    */
   class Oem7MessageNode :
       public Oem7MessageDecoderUserIf,
-      public rclcpp::Node
+      public rclcpp::Node,
+      public ClockSyncedNodeIf
   {
     std::mutex node_mtx_; ///< Protects node internal state
+
+    // Clock sync: map device (GPS) time -> host clock so bursty transport delivery
+    // stops contaminating timestamps. Fed from each raw message's OEM7 header in
+    // onNewMessage(); the synced stamp is read by Oem7RosPublisher via ClockSyncedNodeIf.
+    std::unique_ptr<art::ClockSync> clock_sync_;
+    bool clock_sync_enabled_ = false;
+    rclcpp::Time synced_stamp_;
 
     double publish_delay_sec_; ///< Delay after publishing each message; used to throttle output with static data sources.
 
@@ -150,6 +161,19 @@ namespace novatel_oem7_driver
       {
         RCLCPP_WARN_STREAM(get_logger(), "Publish Delay: " << publish_delay_sec_ << " seconds. Is this is a test?");
       }
+
+      // Clock sync: map device (GPS) time -> host clock so bursty delivery stops
+      // contaminating measurement timestamps. Off by default; enable on hosts not
+      // already disciplined in the background (PTP / GPS-PPS).
+      art::ClockSync::Config clock_cfg;
+      clock_cfg.enabled     = declare_parameter<bool>("enable_clock_sync", false);
+      clock_cfg.window_sec  = declare_parameter<double>("clock_sync.window_sec", 2.0);
+      clock_cfg.min_samples = static_cast<std::size_t>(
+        declare_parameter<int>("clock_sync.min_samples", 50));
+      clock_sync_ = std::make_unique<art::ClockSync>(clock_cfg);
+      clock_sync_enabled_ = clock_cfg.enabled;
+      RCLCPP_INFO_STREAM(get_logger(), "Clock sync "
+        << (clock_sync_enabled_ ? "ENABLED (device-time stamping)" : "disabled (receipt time)"));
 
       // Load plugins
 
@@ -326,6 +350,46 @@ namespace novatel_oem7_driver
    /**
      * Called by ROS decoder with new raw messages
      */
+    // ClockSyncedNodeIf
+    bool clockSyncEnabled() const override {return clock_sync_enabled_;}
+    rclcpp::Time syncedStamp() const override {return synced_stamp_;}
+
+    /**
+     * Update the device->host clock estimate from this raw message's GPS time and
+     * cache the synced stamp for the handlers that publish from it.
+     */
+    void updateClockSync(const Oem7RawMessageIf::ConstPtr& raw_msg)
+    {
+      const rclcpp::Time arrival = now();
+      const auto fmt = raw_msg->getMessageFormat();
+      novatel_oem7_msgs::msg::Oem7Header hdr;
+      if(fmt == Oem7RawMessageIf::OEM7MSGFMT_BINARY)
+      {
+        getOem7Header(raw_msg, hdr);
+      }
+      else if(fmt == Oem7RawMessageIf::OEM7MSGFMT_SHORTBINARY)
+      {
+        getOem7ShortHeader(raw_msg, hdr);
+      }
+      else // NMEA/ASCII: no binary GPS-time header available.
+      {
+        synced_stamp_ = arrival;
+        return;
+      }
+
+      if(hdr.gps_week_number == 0) // GPS time not yet resolved.
+      {
+        synced_stamp_ = arrival;
+        return;
+      }
+
+      const double gps_s =
+        static_cast<double>(hdr.gps_week_number) * 604800.0 +
+        static_cast<double>(hdr.gps_week_milliseconds) * 1e-3;
+      const double host_s = clock_sync_->update(gps_s, arrival.seconds());
+      synced_stamp_ = arrival - rclcpp::Duration::from_seconds(arrival.seconds() - host_s);
+    }
+
     void onNewMessage(Oem7RawMessageIf::ConstPtr raw_msg)
     {
       RCLCPP_DEBUG_STREAM(get_logger(),
@@ -386,6 +450,10 @@ namespace novatel_oem7_driver
              (raw_msg->getMessageFormat() == Oem7RawMessageIf::OEM7MSGFMT_ASCII && isNMEAMessage(raw_msg)))
           {
             updateLogStatistics(raw_msg);
+            if(clock_sync_enabled_)
+            {
+              updateClockSync(raw_msg);
+            }
             msg_handler_->handleMessage(raw_msg);
       
             // Publish raw messages regardless; they are all for debugging.

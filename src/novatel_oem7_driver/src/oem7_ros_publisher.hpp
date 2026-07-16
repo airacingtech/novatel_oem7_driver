@@ -29,6 +29,7 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include <driver_parameter.hpp>
+#include <oem7_clock_sync_if.hpp>
 
 
 namespace novatel_oem7_driver
@@ -94,7 +95,12 @@ public:
     }
 
     msg->header.frame_id = frame_id_;
-    msg->header.stamp    = node_.now();
+
+    // Use device-time-synced stamp when the node provides one; else receipt time.
+    auto* csync = dynamic_cast<ClockSyncedNodeIf*>(&node_);
+    msg->header.stamp = (csync && csync->clockSyncEnabled())
+                          ? csync->syncedStamp()
+                          : node_.now();
 
     ros_pub_->publish(*msg);
   }
