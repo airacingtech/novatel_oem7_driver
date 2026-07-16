@@ -163,10 +163,10 @@ namespace novatel_oem7_driver
       }
 
       // Clock sync: map device (GPS) time -> host clock so bursty delivery stops
-      // contaminating measurement timestamps. Off by default; enable on hosts not
+      // contaminating measurement timestamps. On by default; disable on hosts
       // already disciplined in the background (PTP / GPS-PPS).
       art::ClockSync::Config clock_cfg;
-      clock_cfg.enabled     = declare_parameter<bool>("enable_clock_sync", false);
+      clock_cfg.enabled     = declare_parameter<bool>("enable_clock_sync", true);
       clock_cfg.window_sec  = declare_parameter<double>("clock_sync.window_sec", 2.0);
       clock_cfg.min_samples = static_cast<std::size_t>(
         declare_parameter<int>("clock_sync.min_samples", 50));
