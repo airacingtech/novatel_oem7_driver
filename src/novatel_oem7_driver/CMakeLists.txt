@@ -196,8 +196,8 @@ if(BUILD_TESTING)
  	)
 
 	find_package(ament_cmake_gtest REQUIRED)
-	ament_add_gtest(test_clock_sync test/test_clock_sync.cpp)
-	target_include_directories(test_clock_sync PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+	ament_add_gtest(test_gps_time test/test_gps_time.cpp)
+	target_include_directories(test_gps_time PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 endif()
 

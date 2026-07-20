@@ -44,7 +44,7 @@
 
 #include <message_handler.hpp>
 
-#include "clock_sync.hpp"
+#include "gps_time.hpp"
 #include <oem7_clock_sync_if.hpp>
 #include <driver_parameter.hpp>
 
@@ -77,11 +77,19 @@ namespace novatel_oem7_driver
   {
     std::mutex node_mtx_; ///< Protects node internal state
 
-    // Clock sync: map device (GPS) time -> host clock so bursty transport delivery
-    // stops contaminating timestamps. Fed from each raw message's OEM7 header in
-    // onNewMessage(); the synced stamp is read by Oem7RosPublisher via ClockSyncedNodeIf.
-    std::unique_ptr<art::ClockSync> clock_sync_;
+    // Device-time stamping: each raw message is stamped from its OEM7 header GPS
+    // time (receiver clock is GNSS-disciplined to ~ns) in onNewMessage(); the
+    // stamp is read by Oem7RosPublisher via ClockSyncedNodeIf.
+    //
+    // Trust gate: header GPS time is only used while the receiver reports a
+    // FINE-class time status (>= 160, per the OEM7 GPS reference time status
+    // table). Below that -- cold boot in particular -- the header carries
+    // RTC-approximate time that can be tens of seconds off with week already
+    // nonzero. Short-header logs (CORRIMUS, INSPVAS, ...) carry no status, so
+    // they use the status of the most recent full-header log.
+    static constexpr uint8_t GPS_REFTIME_FINE = 160;
     bool clock_sync_enabled_ = false;
+    bool gps_time_fine_ = false;
     rclcpp::Time synced_stamp_;
 
     double publish_delay_sec_; ///< Delay after publishing each message; used to throttle output with static data sources.
@@ -162,18 +170,12 @@ namespace novatel_oem7_driver
         RCLCPP_WARN_STREAM(get_logger(), "Publish Delay: " << publish_delay_sec_ << " seconds. Is this is a test?");
       }
 
-      // Clock sync: map device (GPS) time -> host clock so bursty delivery stops
-      // contaminating measurement timestamps. On by default; disable on hosts
-      // already disciplined in the background (PTP / GPS-PPS).
-      art::ClockSync::Config clock_cfg;
-      clock_cfg.enabled     = declare_parameter<bool>("enable_clock_sync", true);
-      clock_cfg.window_sec  = declare_parameter<double>("clock_sync.window_sec", 2.0);
-      clock_cfg.min_samples = static_cast<std::size_t>(
-        declare_parameter<int>("clock_sync.min_samples", 50));
-      clock_sync_ = std::make_unique<art::ClockSync>(clock_cfg);
-      clock_sync_enabled_ = clock_cfg.enabled;
-      RCLCPP_INFO_STREAM(get_logger(), "Clock sync "
-        << (clock_sync_enabled_ ? "ENABLED (device-time stamping)" : "disabled (receipt time)"));
+      // Device-time stamping: publish with the receiver's GPS solution time
+      // converted to UTC. Exact (integer ns) and immune to transport/receiver
+      // output latency; receipt time is used until GPS time resolves (week 0).
+      clock_sync_enabled_ = declare_parameter<bool>("enable_clock_sync", true);
+      RCLCPP_INFO_STREAM(get_logger(), "Device-time stamping "
+        << (clock_sync_enabled_ ? "ENABLED (GPS solution time)" : "disabled (receipt time)"));
 
       // Load plugins
 
@@ -355,39 +357,37 @@ namespace novatel_oem7_driver
     rclcpp::Time syncedStamp() const override {return synced_stamp_;}
 
     /**
-     * Update the device->host clock estimate from this raw message's GPS time and
-     * cache the synced stamp for the handlers that publish from it.
+     * Compute the stamp for this raw message from its header GPS time and cache
+     * it for the handlers that publish from it.
      */
-    void updateClockSync(const Oem7RawMessageIf::ConstPtr& raw_msg)
+    void updateSyncedStamp(const Oem7RawMessageIf::ConstPtr& raw_msg)
     {
-      const rclcpp::Time arrival = now();
       const auto fmt = raw_msg->getMessageFormat();
       novatel_oem7_msgs::msg::Oem7Header hdr;
       if(fmt == Oem7RawMessageIf::OEM7MSGFMT_BINARY)
       {
         getOem7Header(raw_msg, hdr);
+        gps_time_fine_ = hdr.time_status >= GPS_REFTIME_FINE;
       }
       else if(fmt == Oem7RawMessageIf::OEM7MSGFMT_SHORTBINARY)
       {
-        getOem7ShortHeader(raw_msg, hdr);
+        getOem7ShortHeader(raw_msg, hdr); // no time status; gps_time_fine_ holds
       }
       else // NMEA/ASCII: no binary GPS-time header available.
       {
-        synced_stamp_ = arrival;
+        synced_stamp_ = now();
         return;
       }
 
-      if(hdr.gps_week_number == 0) // GPS time not yet resolved.
+      if(hdr.gps_week_number == 0 || !gps_time_fine_) // GPS time not trustworthy yet.
       {
-        synced_stamp_ = arrival;
+        synced_stamp_ = now();
         return;
       }
 
-      const double gps_s =
-        static_cast<double>(hdr.gps_week_number) * 604800.0 +
-        static_cast<double>(hdr.gps_week_milliseconds) * 1e-3;
-      const double host_s = clock_sync_->update(gps_s, arrival.seconds());
-      synced_stamp_ = arrival - rclcpp::Duration::from_seconds(arrival.seconds() - host_s);
+      synced_stamp_ = rclcpp::Time(
+        art::gps_week_ms_to_unix_ns(hdr.gps_week_number, hdr.gps_week_milliseconds),
+        RCL_ROS_TIME);
     }
 
     void onNewMessage(Oem7RawMessageIf::ConstPtr raw_msg)
@@ -452,7 +452,7 @@ namespace novatel_oem7_driver
             updateLogStatistics(raw_msg);
             if(clock_sync_enabled_)
             {
-              updateClockSync(raw_msg);
+              updateSyncedStamp(raw_msg);
             }
             msg_handler_->handleMessage(raw_msg);
       
