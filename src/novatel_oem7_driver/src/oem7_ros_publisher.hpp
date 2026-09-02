@@ -96,11 +96,14 @@ public:
 
     msg->header.frame_id = frame_id_;
 
-    // Use device-time-synced stamp when the node provides one; else receipt time.
-    auto* csync = dynamic_cast<ClockSyncedNodeIf*>(&node_);
-    msg->header.stamp = (csync && csync->clockSyncEnabled())
-                          ? csync->syncedStamp()
-                          : node_.now();
+    if(msg->header.stamp.sec == 0 && msg->header.stamp.nanosec == 0)
+    {
+      // Use device-time-synced stamp when the node provides one; else receipt time.
+      auto* csync = dynamic_cast<ClockSyncedNodeIf*>(&node_);
+      msg->header.stamp = (csync && csync->clockSyncEnabled())
+                            ? csync->syncedStamp()
+                            : node_.now();
+    }
 
     ros_pub_->publish(*msg);
   }
