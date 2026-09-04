@@ -22,6 +22,8 @@ public:
 
   /** @return host-clock stamp for the message currently being handled. */
   virtual rclcpp::Time syncedStamp() const = 0;
+
+  virtual bool gpsTimeFine() const = 0;
 };
 
 }  // namespace novatel_oem7_driver

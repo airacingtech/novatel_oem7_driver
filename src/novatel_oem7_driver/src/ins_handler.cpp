@@ -45,8 +45,12 @@
 
 #include <oem7_ros_publisher.hpp>
 #include <driver_parameter.hpp>
+#include <oem7_clock_sync_if.hpp>
+
+#include "gps_time.hpp"
 
 #include <cstring>
+#include <cmath>
 #include <math.h>
 #include <map>
 
@@ -84,9 +88,7 @@ namespace novatel_oem7_driver
 
     oem7_imu_rate_t imu_rate_;                    ///< IMU output rate
 
-    static constexpr double GPS_TO_UNIX_EPOCH_OFFSET = 315964800.0;
-    static constexpr double SECONDS_PER_GPS_WEEK = 604800.0;
-    int gps_leap_seconds_;
+    ClockSyncedNodeIf* csync_{nullptr};
     double          imu_raw_gyro_scale_factor_;   ///< IMU-specific raw gyroscope scaling
     double          imu_raw_accel_scale_factor_;  ///< IMU-specific raw acceleration scaling.
     double          imu_temperature_scale_factor_;  ///< IMU-specific raw temperature scaling.
@@ -282,15 +284,13 @@ namespace novatel_oem7_driver
 
       imu->orientation_covariance[0] = DATA_NOT_AVAILABLE;
 
-      if(raw->gnss_week > 0)
+      if(raw->gnss_week > 0 && csync_ && csync_->clockSyncEnabled() && csync_->gpsTimeFine())
       {
-        const double gps_seconds =
-          static_cast<double>(raw->gnss_week) * SECONDS_PER_GPS_WEEK + raw->gnss_week_seconds;
-        const double unix_seconds =
-          gps_seconds + GPS_TO_UNIX_EPOCH_OFFSET - static_cast<double>(gps_leap_seconds_);
-        imu->header.stamp.sec = static_cast<int32_t>(unix_seconds);
-        imu->header.stamp.nanosec = static_cast<uint32_t>(
-          (unix_seconds - static_cast<double>(imu->header.stamp.sec)) * 1e9);
+        imu->header.stamp = rclcpp::Time(
+          art::gps_week_tow_ns_to_unix_ns(
+            raw->gnss_week,
+            static_cast<int64_t>(std::llround(raw->gnss_week_seconds * 1e9))),
+          RCL_ROS_TIME);
       }
 
       raw_imu_pub_->publish(imu);
@@ -313,7 +313,6 @@ namespace novatel_oem7_driver
   public:
     INSHandler():
       imu_rate_(0),
-      gps_leap_seconds_(18),
       imu_raw_gyro_scale_factor_ (0.0),
       imu_raw_accel_scale_factor_(0.0),
       imu_temperature_scale_factor_(0.0)
@@ -327,6 +326,7 @@ namespace novatel_oem7_driver
     void initialize(rclcpp::Node& node)
     {
       node_ = &node;
+      csync_ = dynamic_cast<ClockSyncedNodeIf*>(&node);
 
       imu_pub_       = std::make_unique<Oem7RosPublisher<sensor_msgs::msg::Imu>>(            "IMU",       node);
       raw_imu_pub_   = std::make_unique<Oem7RosPublisher<sensor_msgs::msg::Imu>>(            "RAWIMU",    node);
@@ -335,8 +335,6 @@ namespace novatel_oem7_driver
       inspvax_pub_   = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::INSPVAX>>(  "INSPVAX",   node);
       insconfig_pub_ = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::INSCONFIG>>("INSCONFIG", node);
       temp_pub_      = std::make_unique<Oem7RosPublisher<sensor_msgs::msg::Temperature>>(    "IMU_TEMPERATURE", node);
-      DriverParameter<int> gps_leap_p("oem7_gps_leap_seconds", 18, *node_);
-      gps_leap_seconds_ = gps_leap_p.value();
 
       DriverParameter<int> imu_rate_p("oem7_imu_rate", 0, *node_);
       imu_rate_ = imu_rate_p.value();

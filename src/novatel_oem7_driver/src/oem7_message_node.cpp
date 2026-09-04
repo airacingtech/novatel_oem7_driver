@@ -355,6 +355,7 @@ namespace novatel_oem7_driver
     // ClockSyncedNodeIf
     bool clockSyncEnabled() const override {return clock_sync_enabled_;}
     rclcpp::Time syncedStamp() const override {return synced_stamp_;}
+    bool gpsTimeFine() const override {return gps_time_fine_;}
 
     /**
      * Compute the stamp for this raw message from its header GPS time and cache
