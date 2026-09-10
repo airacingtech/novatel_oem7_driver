@@ -45,8 +45,12 @@
 
 #include <oem7_ros_publisher.hpp>
 #include <driver_parameter.hpp>
+#include <oem7_clock_sync_if.hpp>
+
+#include "gps_time.hpp"
 
 #include <cstring>
+#include <cmath>
 #include <math.h>
 #include <map>
 
@@ -83,6 +87,8 @@ namespace novatel_oem7_driver
     std::shared_ptr<novatel_oem7_msgs::msg::INSSTDEV> insstdev_;
 
     oem7_imu_rate_t imu_rate_;                    ///< IMU output rate
+
+    ClockSyncedNodeIf* csync_{nullptr};
     double          imu_raw_gyro_scale_factor_;   ///< IMU-specific raw gyroscope scaling
     double          imu_raw_accel_scale_factor_;  ///< IMU-specific raw acceleration scaling.
     double          imu_temperature_scale_factor_;  ///< IMU-specific raw temperature scaling.
@@ -113,8 +119,11 @@ namespace novatel_oem7_driver
       MakeROSMessage(msg, insconfig);
       insconfig_pub_->publish(insconfig);
 
-      const oem7_imu_type_t imu_type = static_cast<oem7_imu_type_t>(insconfig->imu_type);
+      configureImu(static_cast<oem7_imu_type_t>(insconfig->imu_type));
+    }
 
+    void configureImu(oem7_imu_type_t imu_type)
+    {
       std::string imu_desc;
       getImuDescription(imu_type, imu_desc);
       
@@ -140,7 +149,7 @@ namespace novatel_oem7_driver
               imu_raw_accel_scale_factor_))
           {
             RCLCPP_ERROR_STREAM(node_->get_logger(), 
-              "IMU type= '" << insconfig->imu_type << "'; Scale factors unavilable. Raw IMU output disabled");
+              "IMU type= '" << imu_type << "'; Scale factors unavilable. Raw IMU output disabled");
             return;
           }
       }
@@ -152,7 +161,7 @@ namespace novatel_oem7_driver
           imu_temperature_scale_factor_))
         {
           RCLCPP_ERROR_STREAM(node_->get_logger(), 
-            "IMU type= '" << insconfig->imu_type << "'; Temperature scale factor unavilable. IMU temperature output unavailable.");
+            "IMU type= '" << imu_type << "'; Temperature scale factor unavilable. IMU temperature output unavailable.");
           return;
         }
       }
@@ -275,6 +284,15 @@ namespace novatel_oem7_driver
 
       imu->orientation_covariance[0] = DATA_NOT_AVAILABLE;
 
+      if(raw->gnss_week > 0 && csync_ && csync_->clockSyncEnabled() && csync_->gpsTimeFine())
+      {
+        imu->header.stamp = rclcpp::Time(
+          art::gps_week_tow_ns_to_unix_ns(
+            raw->gnss_week,
+            static_cast<int64_t>(std::llround(raw->gnss_week_seconds * 1e9))),
+          RCL_ROS_TIME);
+      }
+
       raw_imu_pub_->publish(imu);
 
       // Temperature: upper 16 bits of the 32-bit IMU Status word (OEM7 RAWIMUSX docs)
@@ -308,6 +326,7 @@ namespace novatel_oem7_driver
     void initialize(rclcpp::Node& node)
     {
       node_ = &node;
+      csync_ = dynamic_cast<ClockSyncedNodeIf*>(&node);
 
       imu_pub_       = std::make_unique<Oem7RosPublisher<sensor_msgs::msg::Imu>>(            "IMU",       node);
       raw_imu_pub_   = std::make_unique<Oem7RosPublisher<sensor_msgs::msg::Imu>>(            "RAWIMU",    node);
@@ -316,11 +335,21 @@ namespace novatel_oem7_driver
       inspvax_pub_   = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::INSPVAX>>(  "INSPVAX",   node);
       insconfig_pub_ = std::make_unique<Oem7RosPublisher<novatel_oem7_msgs::msg::INSCONFIG>>("INSCONFIG", node);
       temp_pub_      = std::make_unique<Oem7RosPublisher<sensor_msgs::msg::Temperature>>(    "IMU_TEMPERATURE", node);
+
       DriverParameter<int> imu_rate_p("oem7_imu_rate", 0, *node_);
       imu_rate_ = imu_rate_p.value();
       if(imu_rate_ > 0)
       {
         RCLCPP_INFO_STREAM(node_->get_logger(), "INS: IMU rate overriden to " << imu_rate_);
+      }
+
+      DriverParameter<int> imu_type_p("oem7_imu_type", 0, *node_);
+      if(imu_type_p.value() > 0)
+      {
+        RCLCPP_INFO_STREAM(node_->get_logger(),
+          "INS: IMU type overriden to " << imu_type_p.value() <<
+          "; raw IMU does not require INSCONFIG (PCAP replay).");
+        configureImu(static_cast<oem7_imu_type_t>(imu_type_p.value()));
       }
     }
 
