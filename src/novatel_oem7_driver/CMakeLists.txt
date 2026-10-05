@@ -125,7 +125,6 @@ add_library(${PROJECT_NAME}_node SHARED
    src/oem7_ros_messages.cpp
    src/message_handler.cpp
 )
-target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME})
 target_link_libraries(${PROJECT_NAME}_node
     ${rclcpp_TARGETS}
     ${rclcpp_components_TARGETS}
