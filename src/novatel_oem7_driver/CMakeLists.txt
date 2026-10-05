@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.20)
 project(novatel_oem7_driver)
 
 
@@ -98,21 +98,23 @@ target_link_libraries(${PROJECT_NAME}
    ${CMAKE_BINARY_DIR}/usr/lib/libCommon.a
    ${CMAKE_BINARY_DIR}/usr/lib/libStreamInterface.a
    ${CMAKE_BINARY_DIR}/usr/lib/libNovatel.a
+   ${CMAKE_BINARY_DIR}/usr/lib/libJsonInterface.a
    ${CMAKE_BINARY_DIR}/usr/lib/libCommon.a
 )
 
 add_dependencies(${PROJECT_NAME} ${OEM7_DECODER})
 
-ament_target_dependencies(${PROJECT_NAME}
-	pluginlib
-	std_msgs
-	gps_msgs
-	sensor_msgs
-	nmea_msgs
-	nav_msgs
-	tf2_geometry_msgs
-	novatel_oem7_msgs
-	backward_ros
+# backward_ros exports no CMake target, only its library.
+target_link_libraries(${PROJECT_NAME}
+	${pluginlib_TARGETS}
+	${std_msgs_TARGETS}
+	${gps_msgs_TARGETS}
+	${sensor_msgs_TARGETS}
+	${nmea_msgs_TARGETS}
+	${nav_msgs_TARGETS}
+	${tf2_geometry_msgs_TARGETS}
+	${novatel_oem7_msgs_TARGETS}
+	${backward_ros_LIBRARIES}
 )
 
 ## Node component library: separate from plugins so pluginlib can dlopen the
@@ -123,13 +125,12 @@ add_library(${PROJECT_NAME}_node SHARED
    src/oem7_ros_messages.cpp
    src/message_handler.cpp
 )
-target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME})
-ament_target_dependencies(${PROJECT_NAME}_node
-    rclcpp
-    rclcpp_components
-    pluginlib
-    novatel_oem7_msgs
-    backward_ros
+target_link_libraries(${PROJECT_NAME}_node
+    ${rclcpp_TARGETS}
+    ${rclcpp_components_TARGETS}
+    ${pluginlib_TARGETS}
+    ${novatel_oem7_msgs_TARGETS}
+    ${backward_ros_LIBRARIES}
 )
 rclcpp_components_register_node(${PROJECT_NAME}_node
   PLUGIN "novatel_oem7_driver::Oem7MessageNode"
@@ -139,7 +140,7 @@ rclcpp_components_register_node(${PROJECT_NAME}_node
 ## Standalone executable with MultiThreadedExecutor
 add_executable(${PROJECT_NAME}_exe src/main.cpp)
 target_link_libraries(${PROJECT_NAME}_exe ${PROJECT_NAME}_node)
-ament_target_dependencies(${PROJECT_NAME}_exe rclcpp)
+target_link_libraries(${PROJECT_NAME}_exe ${rclcpp_TARGETS})
 
 install(TARGETS ${PROJECT_NAME}_node
   ARCHIVE DESTINATION lib

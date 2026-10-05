@@ -40,6 +40,7 @@ import launch_testing.util
 import launch_testing_ros
 
 
+import glob
 import os
 import time
 
@@ -76,7 +77,7 @@ def generate_test_description(name, topics):
         )
     
     rosbag_desc = launch.actions.ExecuteProcess(
-            cmd= ['ros2', 'bag', 'record', '-o', name] + topics,
+            cmd= ['ros2', 'bag', 'record', '-s', 'sqlite3', '-o', name, '--topics'] + topics,
             output='screen')
     
     
@@ -108,7 +109,10 @@ class BagEquivalencyTest(unittest.TestCase):
         test_dir  = test_args['test_dir']
         test_name = test_args['test_name']
 
-        uut_bag = os.getcwd() + '/' + test_name + '/' + test_name + '_0.db3'
+        # rosbag2's file naming varies by distro; the recording dir is recreated per test.
+        uut_bags = glob.glob(os.path.join(os.getcwd(), test_name, '*.db3'))
+        self.assertEqual(len(uut_bags), 1, uut_bags)
+        uut_bag = uut_bags[0]
         ref_bag = test_dir + '/' + test_name + '.db3'
         
         rosbag_comparison.verify_bag_equivalency(ref_bag, uut_bag)

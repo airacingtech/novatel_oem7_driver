@@ -38,7 +38,7 @@ namespace novatel_oem7_driver
   template <typename T>
   class Oem7Receiver: public Oem7ReceiverIf
   {
-    boost::asio::io_service io_;
+    boost::asio::io_context io_;
 
     enum
     {

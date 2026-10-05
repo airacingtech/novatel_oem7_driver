@@ -97,7 +97,7 @@ namespace novatel_oem7_driver
         sleep(3); // Use absolute sleep, as this is not related to ROS internal timing.
       }
 
-      oem7_file_.read(boost::asio::buffer_cast<char*>(buf), boost::asio::buffer_size(buf));
+      oem7_file_.read(static_cast<char*>(buf.data()), boost::asio::buffer_size(buf));
       int errno_value = errno; // Cache errno locally, in case any ROS calls /macros affect it.
 
       rlen = oem7_file_.gcount();
