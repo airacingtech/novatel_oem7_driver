@@ -58,7 +58,7 @@ namespace novatel_oem7_driver
       boost::system::error_code err;
 
       this->endpoint_.close(err); // Doesn't matter if we fail.
-      this->endpoint_.connect(typename T::endpoint(boost::asio::ip::address::from_string(recvr_ip_addr.value()), recvr_port.value()), err);
+      this->endpoint_.connect(typename T::endpoint(boost::asio::ip::make_address(recvr_ip_addr.value()), recvr_port.value()), err);
       // Proceed regardless; successful connection does not guarantee subsequent operations will succeed.
 
       RCLCPP_INFO_STREAM(node_->get_logger(),

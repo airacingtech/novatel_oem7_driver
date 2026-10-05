@@ -336,7 +336,7 @@ namespace novatel_oem7_driver
       }
 
       size_t bytes_to_read = boost::asio::buffer_size(buf);
-      uint8_t* buffer_ptr = boost::asio::buffer_cast<uint8_t*>(buf);
+      uint8_t* buffer_ptr = static_cast<uint8_t*>(buf.data());
       size_t bytes_written = 0;
 
       if(stream_buffer_pos_ < stream_buffer_.size())

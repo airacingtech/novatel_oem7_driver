@@ -89,7 +89,7 @@ namespace novatel_oem7_driver
       bool ok = recvr_->read(buf, s);
       if(ok)
       {
-        receiver_dbg_file_->write(boost::asio::buffer_cast<unsigned char*>(buf), s);
+        receiver_dbg_file_->write(static_cast<unsigned char*>(buf.data()), s);
       }
 
       return ok;
